@@ -1,0 +1,95 @@
+Phase 1 — Setup & Identity Foundation
+
+Add additional school details to the setup wizard and profile, including the school registration number, region, district, and any other relevant institutional information. These details should be pulled into the user/school profile popup and reflected across the system wherever school information is displayed.
+
+
+
+Phase 2 — Core System Fixes
+
+A search function already exists but does not work correctly. Fix it so that it can locate any data across the entire application — students, staff, fees, attendance, events, inventory, expenses, scholarships, and any other module. Each search result should display the record name, the module it belongs to, and a clickable link that navigates directly to that record or page.
+
+A grading system already exists but is not editable. Make it fully editable so that the administrator can define and modify grade boundaries, labels, and remarks (e.g. 80–100 = A, Excellent). Changes should reflect immediately across all academic modules that use grading.
+
+
+
+Phase 3 — Dashboard & Calendar
+
+Add a school academic calendar with a dedicated setup wizard. When the user clicks Start, the wizard should guide them through adding the academic term details including term name, start date, end date, and key events such as holidays, exams, parents' day, and speech and prizegiving day. Events should be categorizable by type.
+
+On the main dashboard, the calendar should be visible at a glance in a compact monthly or weekly view with upcoming events listed beneath it in chronological order, showing the event name and date.
+
+Clicking on any event on the dashboard or calendar should open a details popup showing the full event information. The popup should include a gear icon that links directly to the event's edit page.
+
+
+
+Phase 4 — Management Modules
+
+Add a robust school expense tracker. It should allow the admin to log expenses by category (e.g. utilities, supplies, maintenance, transport), record the amount, date, description, and who approved it. It should show a summary of total expenditure by category and by month, with the ability to filter and export records.
+
+Add an inventory manager. It should allow the school to track items such as furniture, books, equipment, and stationery. Each item should have a name, category, quantity, condition, date acquired, and location. The system should flag items with low stock or poor condition.
+
+Add a scholarship management page. Each scholarship student should have a full profile including their name, class, photo, scholarship type, sponsor name, and benefits received. The system should issue a dismissable notification if a scholarship student's profile is incomplete or missing required details. The notification should persist until the data is entered or manually dismissed.
+
+
+
+Phase 5 — Notifications & Alerts
+
+Add a notification center accessible from the main navigation. It should automatically generate and display notifications for the following: incomplete student or staff data, upcoming calendar events (e.g. 3 days before an event), scholarship profiles with missing details, low inventory stock, overdue fees, and any other relevant systemwide alerts based on the features of the application. Notifications should be dismissable individually or all at once, and should show a timestamp and a link to the relevant page or record.
+
+
+
+Phase 6 — Ambient Features
+
+Add an hourly chime tied to the school timetable. At the start of each period as defined in the timetable, a chime sound should play automatically. The sound should be customizable — the admin should be able to upload or select from a set of builtin chime sounds. The chime should only be active during school hours as defined in the timetable and should be easy to enable or disable.
+
+
+
+Student Management
+
+Add a student promotion and retention tracker. At the end of each academic year or term, the system should allow the admin to mark each student as promoted to the next class or retained in their current class, with a reason field. The history of promotions and retentions should be stored and viewable on the student's profile.
+
+Add a student conduct and disciplinary log. Each entry should record the student's name, class, date of incident, description of the incident, action taken, and the staff member who handled it. The log should be viewable from the student's profile and filterable by class or date.
+
+
+
+Academic
+
+Add class performance analytics. This should show the class average per subject, the highest and lowest scores, and performance trends across terms. Results should be viewable per class and per subject, with simple charts or graphs for visual clarity.
+
+Add an assignment and homework tracker per class. Teachers should be able to log assignments with a title, subject, class, date assigned, and due date. The system should flag overdue assignments and send a notification alert.
+
+
+
+Staff Management
+
+Add a staff attendance and leave tracker. Daily attendance should be loggable per staff member. Leave requests should be recordable with a type (sick, annual, compassionate), start and end dates, and approval status. Summaries should be viewable per staff member and per month.
+
+Add a basic staff payroll summary. For each staff member, record their salary, allowances, deductions, and net pay per month. The system does not need to process payments but should store and display a clear monthly payroll record that can be printed or exported.
+
+
+
+Communication
+
+Add a notice and announcement board. Announcements can be schoolwide or targeted to a specific class. Each notice should have a title, body, date posted, and the author. Notices should appear in a feed sorted by most recent and should also trigger a notification in the notification center.
+
+Add an SMS or email notification log. Any time a message is sent to parents or staff through the system, a log entry should be created showing the recipient, the message content, the date and time sent, and the delivery status.
+
+
+
+Finance
+
+Add a petty cash log. Each entry should record the amount, purpose, date, and the person who authorized or received it. A running balance should be maintained and displayed, and the log should be exportable.
+
+
+
+Infrastructure & Data
+
+Add an audit log that tracks all significant actions performed in the system, including who made a change, what was changed, the old value, the new value, and the date and time of the change. The log should be viewable by the administrator and filterable by user, module, or date.
+
+Add rolebased access control. Define at least three roles: Administrator (full access), Teacher (access to attendance, assignments, conduct log, and their class data), and Headmistress (readonly access to all modules with the ability to approve leave). Roles should be assignable per user account and should restrict or grant access to pages and actions accordingly.
+
+
+
+ParentFacing (Future Scope)
+
+Add a parent portal or printable progress report. Parents should be able to receive or access a summary of their child's attendance, academic performance, fees status, and any conduct incidents. This can be implemented as a printable report generated from the system or as a simple readonly view accessible via a parent login.
