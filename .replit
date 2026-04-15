@@ -1,26 +1,5 @@
-modules = ["nodejs-20"]
-
 [nix]
 channel = "stable-25_05"
 
 [agent]
 expertMode = true
-
-[workflows]
-runButton = "Start application"   # <-- Point directly to the server workflow
-
-[[workflows.workflow]]
-name = "Start application"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = ["node", "server.js"]      # <-- Use an array, not a string
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[ports]]
-localPort = 5000
-externalPort = 80
