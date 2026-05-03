@@ -10,6 +10,53 @@ const API = {
 let _settings = {}, _students = [], _teachers = [], _classes = [], _subjects = [];
 let _editId = null;
 
+// ─── MOBILE SIDEBAR ──────────────────────────────────────────────────────────
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const bd = document.getElementById('sidebar-backdrop');
+  const isOpen = sb.classList.toggle('sb-open');
+  bd.classList.toggle('active', isOpen);
+}
+function closeSidebar() {
+  document.getElementById('sidebar').classList.remove('sb-open');
+  document.getElementById('sidebar-backdrop').classList.remove('active');
+}
+
+// ─── MOBILE SEARCH ───────────────────────────────────────────────────────────
+function toggleMobileSearch() {
+  const bar = document.getElementById('mobile-search-bar');
+  const isHidden = bar.style.display === 'none' || bar.classList.contains('hidden');
+  if (isHidden) {
+    bar.style.display = 'flex';
+    bar.classList.remove('hidden');
+    document.getElementById('mobile-search-input').focus();
+  } else {
+    bar.style.display = 'none';
+    bar.classList.add('hidden');
+    document.getElementById('search-results').style.display = 'none';
+  }
+}
+
+// Wire mobile search input to same search handler
+document.addEventListener('DOMContentLoaded', () => {
+  const msi = document.getElementById('mobile-search-input');
+  if (msi) {
+    msi.addEventListener('input', () => {
+      const si = document.getElementById('search-input');
+      si.value = msi.value;
+      si.dispatchEvent(new Event('input'));
+    });
+  }
+  // Show mobile search button on small screens
+  const updateMobileUI = () => {
+    const isMobile = window.innerWidth <= 768;
+    const mBtn = document.getElementById('btn-mobile-search');
+    if (mBtn) mBtn.style.display = isMobile ? 'flex' : 'none';
+  };
+  updateMobileUI();
+  window.addEventListener('resize', updateMobileUI);
+});
+
 // ─── NAVIGATION ──────────────────────────────────────────────────────────────
 const sectionTitles = {
   dashboard: ['Dashboard', 'Welcome to your school management portal'],
@@ -54,6 +101,13 @@ function navigate(section) {
   document.getElementById('tb-page-title').textContent = title;
   document.getElementById('tb-page-sub').textContent = sub;
   document.getElementById('search-results').style.display = 'none';
+  // Mobile: close sidebar & sync bottom nav
+  if (window.innerWidth <= 768) {
+    closeSidebar();
+    document.querySelectorAll('#bottom-nav .bnav-item[data-section]').forEach(b => {
+      b.classList.toggle('active', b.dataset.section === section);
+    });
+  }
   // Load data
   const loaders = {
     dashboard: loadDashboard, students: loadStudents, teachers: loadTeachers,
@@ -94,7 +148,12 @@ document.querySelectorAll('.modal-overlay').forEach(el => {
 // ─── TOAST ───────────────────────────────────────────────────────────────────
 function toast(msg, type = 'success') {
   const t = document.createElement('div');
-  t.style.cssText = `position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:8px;color:#fff;font-size:.85rem;z-index:9999;animation:slideUp .2s ease;max-width:320px;box-shadow:0 4px 12px rgba(0,0,0,.15)`;
+  const isMobile = window.innerWidth <= 768;
+  if (isMobile) {
+    t.style.cssText = `position:fixed;top:68px;left:50%;transform:translateX(-50%);padding:12px 18px;border-radius:8px;color:#fff;font-size:.85rem;z-index:9999;animation:slideUp .2s ease;max-width:90vw;box-shadow:0 4px 12px rgba(0,0,0,.15);white-space:nowrap`;
+  } else {
+    t.style.cssText = `position:fixed;bottom:20px;right:20px;padding:12px 18px;border-radius:8px;color:#fff;font-size:.85rem;z-index:9999;animation:slideUp .2s ease;max-width:320px;box-shadow:0 4px 12px rgba(0,0,0,.15)`;
+  }
   t.style.background = { success: '#22c55e', danger: '#ef4444', warning: '#f59e0b', info: '#3b82f6' }[type] || '#3b82f6';
   t.textContent = msg;
   document.body.appendChild(t);
