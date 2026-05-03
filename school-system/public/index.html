@@ -724,7 +724,30 @@ tr:hover td{background:#f8fafc}
           <div class="form-group"><label class="form-label">Website</label><input class="form-control" id="s-website"></div>
           <div class="form-group"><label class="form-label">P.O. Box</label><input class="form-control" id="s-poBox"></div>
         </div>
-        <div class="form-group"><label class="form-label">School Logo (URL or Base64)</label><input class="form-control" id="s-logo" placeholder="Paste image URL or base64"></div>
+        <div class="form-group">
+          <label class="form-label">School Logo</label>
+          <div style="display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap">
+            <!-- Preview box -->
+            <div id="logo-preview-wrap" style="width:88px;height:88px;border-radius:10px;border:2px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;position:relative">
+              <span id="logo-preview-placeholder" style="color:var(--muted);font-size:.72rem;text-align:center;padding:4px"><i class="fa fa-image" style="display:block;font-size:1.6rem;margin-bottom:4px;opacity:.4"></i>No logo</span>
+              <img id="logo-preview-img" src="" alt="Logo" style="display:none;width:100%;height:100%;object-fit:cover;border-radius:8px">
+              <button id="logo-remove-btn" onclick="removeLogo()" title="Remove logo" style="display:none;position:absolute;top:3px;right:3px;background:rgba(0,0,0,.55);border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;color:#fff;font-size:.6rem;align-items:center;justify-content:center"><i class="fa fa-times"></i></button>
+            </div>
+            <!-- Drop zone -->
+            <div style="flex:1;min-width:180px">
+              <label id="logo-drop-zone" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--border);border-radius:10px;padding:18px 12px;cursor:pointer;background:var(--bg);transition:background .15s,border-color .15s;gap:5px;text-align:center"
+                ondragover="event.preventDefault();this.style.background='#dbeafe';this.style.borderColor='var(--blue)'"
+                ondragleave="this.style.background='var(--bg)';this.style.borderColor='var(--border)'"
+                ondrop="handleLogoDrop(event)">
+                <i class="fa fa-cloud-upload-alt" style="font-size:1.5rem;color:var(--blue);opacity:.7"></i>
+                <span style="font-size:.82rem;font-weight:600;color:var(--text)">Drag &amp; drop your logo here</span>
+                <span style="font-size:.72rem;color:var(--muted)">or click to browse &nbsp;·&nbsp; PNG, JPG, SVG</span>
+                <input type="file" id="logo-file-input" accept="image/*" style="display:none" onchange="handleLogoFileSelect(this)">
+              </label>
+              <div id="logo-filename" style="font-size:.72rem;color:var(--muted);margin-top:5px;display:none"></div>
+            </div>
+          </div>
+        </div>
         <button class="btn btn-primary" onclick="saveSettings()"><i class="fa fa-save"></i> Save School Info</button>
       </div></div>
       <div id="tab-academic" class="tab-pane"><div class="card card-body">

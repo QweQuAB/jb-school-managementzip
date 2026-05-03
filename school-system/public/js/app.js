@@ -172,9 +172,11 @@ function switchTab(id, btn) {
 }
 
 // ─── SETTINGS ────────────────────────────────────────────────────────────────
+let _currentLogoBase64 = '';
+
 async function loadSettings() {
   _settings = await API.get('/api/settings');
-  const keys = ['schoolName','motto','address','city','phone','email','website','poBox','logo',
+  const keys = ['schoolName','motto','address','city','phone','email','website','poBox',
     'currentTerm','academicYear','currency','standardFee','admPrefix','billingAppUrl','lowStockThreshold',
     'adminName','adminRole','userRole','userPin','schoolRegNo','region','district',
     'chimeEnabled','chimeSound','chimeVolume'];
@@ -184,10 +186,13 @@ async function loadSettings() {
     if (el.type === 'checkbox') el.checked = _settings[k] === '1';
     else el.value = _settings[k] || '';
   });
+  // Populate logo preview
+  _currentLogoBase64 = _settings.logo || '';
+  setLogoPreview(_currentLogoBase64, '');
 }
 
 async function saveSettings() {
-  const keys = ['schoolName','motto','address','city','phone','email','website','poBox','logo',
+  const keys = ['schoolName','motto','address','city','phone','email','website','poBox',
     'currentTerm','academicYear','currency','standardFee','admPrefix','billingAppUrl','lowStockThreshold',
     'adminName','adminRole','userRole','userPin','schoolRegNo','region','district',
     'chimeSound','chimeVolume'];
@@ -195,6 +200,7 @@ async function saveSettings() {
   keys.forEach(k => { const el = document.getElementById(`s-${k}`); if (el) data[k] = el.value; });
   const chimeEl = document.getElementById('s-chimeEnabled');
   if (chimeEl) data.chimeEnabled = chimeEl.checked ? '1' : '0';
+  data.logo = _currentLogoBase64;
   await API.put('/api/settings', data);
   _settings = { ..._settings, ...data };
   updateBranding();
@@ -209,9 +215,79 @@ function updateBranding() {
   document.getElementById('sb-term').textContent = `${term} • ${year}`;
   const initials = name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
   document.getElementById('tb-avatar').textContent = initials;
+  const sbLogo = document.getElementById('sb-logo');
   if (_settings.logo) {
-    document.getElementById('sb-logo').innerHTML = `<img src="${_settings.logo}" style="width:36px;height:36px;border-radius:6px;object-fit:cover">`;
+    sbLogo.innerHTML = `<img src="${_settings.logo}" style="width:36px;height:36px;border-radius:6px;object-fit:cover">`;
+  } else {
+    sbLogo.innerHTML = `<i class="fa fa-graduation-cap"></i>`;
   }
+}
+
+// ─── LOGO UPLOAD ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('logo-drop-zone');
+  if (dz) dz.addEventListener('click', () => document.getElementById('logo-file-input').click());
+});
+
+function handleLogoDrop(e) {
+  e.preventDefault();
+  const dz = document.getElementById('logo-drop-zone');
+  dz.style.background = 'var(--bg)';
+  dz.style.borderColor = 'var(--border)';
+  const file = e.dataTransfer.files[0];
+  if (file) processLogoFile(file);
+}
+
+function handleLogoFileSelect(input) {
+  const file = input.files[0];
+  if (file) processLogoFile(file);
+}
+
+function processLogoFile(file) {
+  if (!file.type.startsWith('image/')) {
+    toast('Please select an image file (PNG, JPG, SVG…)', 'danger');
+    return;
+  }
+  if (file.size > 5 * 1024 * 1024) {
+    toast('Image is too large — please use a file under 5 MB', 'warning');
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    _currentLogoBase64 = e.target.result;
+    setLogoPreview(_currentLogoBase64, file.name);
+    toast('Logo ready — click Save to apply it', 'info');
+  };
+  reader.readAsDataURL(file);
+}
+
+function setLogoPreview(src, filename) {
+  const img = document.getElementById('logo-preview-img');
+  const placeholder = document.getElementById('logo-preview-placeholder');
+  const removeBtn = document.getElementById('logo-remove-btn');
+  const fileLabel = document.getElementById('logo-filename');
+  if (!img) return;
+  if (src) {
+    img.src = src;
+    img.style.display = 'block';
+    placeholder.style.display = 'none';
+    removeBtn.style.display = 'flex';
+    if (filename) { fileLabel.textContent = filename; fileLabel.style.display = 'block'; }
+    else { fileLabel.style.display = 'none'; }
+  } else {
+    img.src = '';
+    img.style.display = 'none';
+    placeholder.style.display = 'block';
+    removeBtn.style.display = 'none';
+    fileLabel.style.display = 'none';
+    document.getElementById('logo-file-input').value = '';
+  }
+}
+
+function removeLogo() {
+  _currentLogoBase64 = '';
+  setLogoPreview('', '');
+  toast('Logo removed — click Save to apply', 'info');
 }
 
 // ─── PROFILE ─────────────────────────────────────────────────────────────────
@@ -1155,7 +1231,22 @@ const wizSteps = [
         <div class="form-group"><label class="form-label">Administrator Name</label><input class="form-control" id="wiz-adminName" value="${_settings.adminName||''}"></div>
         <div class="form-group"><label class="form-label">Title / Role</label><input class="form-control" id="wiz-adminRole" value="${_settings.adminRole||'Headmaster'}"></div>
       </div>
-      <div class="form-group"><label class="form-label">Logo URL or Base64 (optional)</label><input class="form-control" id="wiz-logo" value="${_settings.logo||''}" placeholder="Paste image URL"></div>`
+      <div class="form-group">
+        <label class="form-label">School Logo <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+        <div style="display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+          <div id="wiz-logo-preview-wrap" style="width:72px;height:72px;border-radius:10px;border:2px solid var(--border);background:var(--bg);display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden">
+            ${_currentLogoBase64 ? `<img src="${_currentLogoBase64}" style="width:100%;height:100%;object-fit:cover">` : `<i class="fa fa-graduation-cap" style="font-size:1.6rem;color:var(--muted);opacity:.4"></i>`}
+          </div>
+          <label style="flex:1;min-width:160px;display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--border);border-radius:10px;padding:14px 10px;cursor:pointer;background:var(--bg);gap:4px;text-align:center"
+            ondragover="event.preventDefault()" ondrop="handleWizLogoDrop(event)">
+            <i class="fa fa-cloud-upload-alt" style="font-size:1.3rem;color:var(--blue);opacity:.7"></i>
+            <span style="font-size:.8rem;font-weight:600">Drag &amp; drop or click to upload</span>
+            <span style="font-size:.7rem;color:var(--muted)">PNG, JPG, SVG</span>
+            <input type="file" id="wiz-logo-file" accept="image/*" style="display:none" onchange="handleWizLogoSelect(this)">
+          </label>
+        </div>
+        <div id="wiz-logo-fname" style="font-size:.72rem;color:var(--muted);margin-top:5px;display:none"></div>
+      </div>`
   },
   {
     title: 'Billing Integration', sub: 'Step 4 of 4 — Optional billing connection',
@@ -1181,15 +1272,43 @@ function renderWizardStep() {
   document.getElementById('wiz-next-btn').textContent = _wizStep === wizSteps.length - 1 ? '✓ Finish' : 'Next →';
 }
 
+function handleWizLogoDrop(e) {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (file) processWizLogoFile(file);
+}
+function handleWizLogoSelect(input) {
+  const file = input.files[0];
+  if (file) processWizLogoFile(file);
+}
+function processWizLogoFile(file) {
+  if (!file.type.startsWith('image/')) { toast('Please select an image file', 'danger'); return; }
+  if (file.size > 5 * 1024 * 1024) { toast('Image too large — use a file under 5 MB', 'warning'); return; }
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    _currentLogoBase64 = ev.target.result;
+    const wrap = document.getElementById('wiz-logo-preview-wrap');
+    if (wrap) wrap.innerHTML = `<img src="${_currentLogoBase64}" style="width:100%;height:100%;object-fit:cover">`;
+    const fname = document.getElementById('wiz-logo-fname');
+    if (fname) { fname.textContent = file.name; fname.style.display = 'block'; }
+    // Also sync the main settings logo preview if open
+    setLogoPreview(_currentLogoBase64, file.name);
+    toast('Logo uploaded — click Next to continue', 'info');
+  };
+  reader.readAsDataURL(file);
+}
+
 async function wizNext() {
   const updates = {};
   const stepKeys = [
     ['schoolName','motto','address','phone','email','poBox','schoolRegNo','region','district'],
     ['currentTerm','academicYear','currency','standardFee','admPrefix'],
-    ['adminName','adminRole','logo'],
+    ['adminName','adminRole'],
     ['billingAppUrl']
   ];
   stepKeys[_wizStep].forEach(k => { const el = document.getElementById(`wiz-${k}`); if (el) updates[k] = el.value; });
+  // Save logo from the shared base64 variable on step 3
+  if (_wizStep === 2) updates.logo = _currentLogoBase64;
   await API.put('/api/settings', updates);
   _settings = { ..._settings, ...updates };
   updateBranding();
