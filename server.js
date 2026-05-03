@@ -429,6 +429,33 @@ app.put('/api/calendar/:id',(req,res)=>{
   res.json({success:true});
 });
 app.delete('/api/calendar/:id',(req,res)=>{db.prepare('DELETE FROM calendar_events WHERE id=?').run(req.params.id);res.json({success:true});});
+app.post('/api/calendar/bulk',(req,res)=>{
+  const events=req.body;
+  if(!Array.isArray(events)||events.length===0){res.status(400).json({error:'Expected a non-empty array of events'});return;}
+  const stmt=db.prepare('INSERT INTO calendar_events(title,startDate,endDate,type,description,term,year,color)VALUES(?,?,?,?,?,?,?,?)');
+  const insert=db.transaction(arr=>{
+    const ids=[];
+    for(const d of arr){
+      if(!d.title||!d.startDate){continue;}
+      const r=stmt.run(
+        String(d.title).trim(),
+        String(d.startDate).trim(),
+        d.endDate?String(d.endDate).trim():String(d.startDate).trim(),
+        d.type||'Event',
+        d.description||'',
+        d.term||'',
+        parseInt(d.year)||new Date().getFullYear(),
+        d.color||EVENT_COLORS_SERVER[d.type]||'#3b82f6'
+      );
+      ids.push(r.lastInsertRowid);
+    }
+    return ids;
+  });
+  const EVENT_COLORS_SERVER={Holiday:'#ef4444',Exam:'#8b5cf6',Meeting:'#f59e0b',Sports:'#22c55e','Parents Day':'#3b82f6','Speech Day':'#f59e0b',Event:'#3b82f6',Other:'#64748b'};
+  const ids=insert(events);
+  logActivity(`Bulk imported ${ids.length} calendar events`,'blue');
+  res.json({imported:ids.length,ids});
+});
 
 // ─── Expenses ────────────────────────────────────────────────────────────────
 app.get('/api/expenses',(req,res)=>res.json(db.prepare('SELECT * FROM expenses ORDER BY date DESC').all()));

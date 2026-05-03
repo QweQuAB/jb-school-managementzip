@@ -113,6 +113,235 @@ async function deleteEvent(id) {
   loadCalendar();
 }
 
+// ─── CALENDAR BULK IMPORT ─────────────────────────────────────────────────────
+const CAL_TEMPLATE = [
+  {
+    "title": "First Day of School",
+    "type": "Event",
+    "term": "Term 1",
+    "startDate": "2025-09-01",
+    "endDate": "2025-09-01",
+    "year": 2025,
+    "color": "#3b82f6",
+    "description": "School reopens for Term 1"
+  },
+  {
+    "title": "Independence Day Holiday",
+    "type": "Holiday",
+    "term": "Term 1",
+    "startDate": "2025-03-06",
+    "endDate": "2025-03-06",
+    "year": 2025,
+    "color": "#ef4444",
+    "description": "National holiday - school closed"
+  },
+  {
+    "title": "Mid-Term Examinations",
+    "type": "Exam",
+    "term": "Term 1",
+    "startDate": "2025-10-06",
+    "endDate": "2025-10-10",
+    "year": 2025,
+    "color": "#8b5cf6",
+    "description": "Mid-term exams for all classes"
+  },
+  {
+    "title": "Staff Meeting",
+    "type": "Meeting",
+    "term": "Term 1",
+    "startDate": "2025-09-15",
+    "endDate": "2025-09-15",
+    "year": 2025,
+    "color": "#f59e0b",
+    "description": "Monthly staff meeting in the conference room"
+  },
+  {
+    "title": "Speech and Prize-Giving Day",
+    "type": "Speech Day",
+    "term": "Term 3",
+    "startDate": "2025-12-05",
+    "endDate": "2025-12-05",
+    "year": 2025,
+    "color": "#f59e0b",
+    "description": "Annual speech and prize-giving ceremony"
+  },
+  {
+    "title": "Inter-School Sports",
+    "type": "Sports",
+    "term": "Term 2",
+    "startDate": "2025-07-14",
+    "endDate": "2025-07-15",
+    "year": 2025,
+    "color": "#22c55e",
+    "description": "Annual inter-school sports competition"
+  },
+  {
+    "title": "Parents Day",
+    "type": "Parents Day",
+    "term": "Term 2",
+    "startDate": "2025-06-28",
+    "endDate": "2025-06-28",
+    "year": 2025,
+    "color": "#3b82f6",
+    "description": "Parents invited to collect report cards and meet teachers"
+  },
+  {
+    "title": "End of Term 1",
+    "type": "Event",
+    "term": "Term 1",
+    "startDate": "2025-12-12",
+    "endDate": "2025-12-12",
+    "year": 2025,
+    "color": "#22c55e",
+    "description": "Last day of Term 1"
+  }
+];
+
+let _calImportData = [];
+
+function openCalendarImport() {
+  _calImportData = [];
+  document.getElementById('cal-template-box').textContent = JSON.stringify(CAL_TEMPLATE, null, 2);
+  document.getElementById('cal-import-preview').style.display = 'none';
+  document.getElementById('cal-import-btn').style.display = 'none';
+  document.getElementById('cal-import-file').value = '';
+  openModal('cal-import-modal');
+}
+
+function copyCalendarTemplate() {
+  navigator.clipboard.writeText(JSON.stringify(CAL_TEMPLATE, null, 2))
+    .then(() => toast('Template copied to clipboard!'))
+    .catch(() => toast('Copy failed — please select and copy manually', 'warning'));
+}
+
+function downloadCalendarTemplate() {
+  const blob = new Blob([JSON.stringify(CAL_TEMPLATE, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'school_calendar_template.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('Template downloaded!');
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const dz = document.getElementById('cal-drop-zone');
+  if (dz) dz.addEventListener('click', () => document.getElementById('cal-import-file').click());
+});
+
+function handleCalDrop(e) {
+  e.preventDefault();
+  document.getElementById('cal-drop-zone').style.background = '#fff';
+  const file = e.dataTransfer.files[0];
+  if (file) processCalImportFile(file);
+}
+
+function handleCalFileSelect(input) {
+  const file = input.files[0];
+  if (file) processCalImportFile(file);
+}
+
+function processCalImportFile(file) {
+  if (!file.name.endsWith('.json')) {
+    toast('Please upload a .json file', 'danger'); return;
+  }
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (!Array.isArray(data)) { toast('JSON must be an array of events [ {...}, {...} ]', 'danger'); return; }
+      _calImportData = data;
+      showCalImportPreview(file.name, data);
+    } catch(err) {
+      toast('Invalid JSON file — check for syntax errors', 'danger');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function showCalImportPreview(filename, data) {
+  const VALID_TYPES = ['Holiday','Exam','Meeting','Sports','Parents Day','Speech Day','Event','Other'];
+  const errors = [];
+  const valid = [];
+  data.forEach((row, i) => {
+    const rowErrors = [];
+    if (!row.title || !String(row.title).trim()) rowErrors.push('missing title');
+    if (!row.startDate || !/^\d{4}-\d{2}-\d{2}$/.test(row.startDate)) rowErrors.push('startDate must be YYYY-MM-DD');
+    if (row.endDate && !/^\d{4}-\d{2}-\d{2}$/.test(row.endDate)) rowErrors.push('endDate must be YYYY-MM-DD');
+    if (row.type && !VALID_TYPES.includes(row.type)) rowErrors.push(`unknown type "${row.type}"`);
+    if (rowErrors.length) errors.push(`Row ${i+1} (${row.title||'?'}): ${rowErrors.join(', ')}`);
+    else valid.push(row);
+  });
+
+  document.getElementById('cal-import-filename').textContent = filename;
+  document.getElementById('cal-import-count').textContent = `${valid.length} valid event${valid.length!==1?'s':''}`;
+  document.getElementById('cal-import-preview').style.display = 'block';
+
+  const errBox = document.getElementById('cal-import-errors');
+  if (errors.length) {
+    errBox.style.display = 'block';
+    errBox.innerHTML = `<div class="alert alert-warning" style="margin-bottom:10px"><i class="fa fa-exclamation-triangle"></i> <strong>${errors.length} row${errors.length>1?'s':''} skipped:</strong><ul style="margin:6px 0 0 18px;font-size:.78rem">${errors.map(e=>`<li>${e}</li>`).join('')}</ul></div>`;
+  } else {
+    errBox.style.display = 'none';
+  }
+
+  const tableWrap = document.getElementById('cal-import-table-wrap');
+  if (valid.length === 0) {
+    tableWrap.innerHTML = `<div class="empty-state" style="padding:20px"><i class="fa fa-exclamation-circle"></i><h4>No valid events found</h4><p>Check the field reference above and fix your file.</p></div>`;
+    document.getElementById('cal-import-btn').style.display = 'none';
+  } else {
+    tableWrap.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:.78rem">
+      <thead><tr>
+        <th style="padding:8px 10px;text-align:left;background:#f8fafc;border-bottom:2px solid #e2e8f0;font-size:.72rem;color:#64748b">Title</th>
+        <th style="padding:8px 10px;text-align:left;background:#f8fafc;border-bottom:2px solid #e2e8f0;font-size:.72rem;color:#64748b">Type</th>
+        <th style="padding:8px 10px;text-align:left;background:#f8fafc;border-bottom:2px solid #e2e8f0;font-size:.72rem;color:#64748b">Start</th>
+        <th style="padding:8px 10px;text-align:left;background:#f8fafc;border-bottom:2px solid #e2e8f0;font-size:.72rem;color:#64748b">End</th>
+        <th style="padding:8px 10px;text-align:left;background:#f8fafc;border-bottom:2px solid #e2e8f0;font-size:.72rem;color:#64748b">Term</th>
+      </tr></thead>
+      <tbody>${valid.map((r,i)=>`<tr style="${i%2?'background:#f8fafc':''}">
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;font-weight:500">${r.title}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0"><span style="background:${EVENT_COLORS[r.type]||'#3b82f6'}20;color:${EVENT_COLORS[r.type]||'#3b82f6'};padding:2px 8px;border-radius:20px;font-size:.7rem;font-weight:600">${r.type||'Event'}</span></td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0">${r.startDate}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0">${r.endDate||r.startDate}</td>
+        <td style="padding:7px 10px;border-bottom:1px solid #e2e8f0">${r.term||'-'}</td>
+      </tr>`).join('')}</tbody>
+    </table>`;
+    _calImportData = valid;
+    document.getElementById('cal-import-btn').style.display = 'inline-flex';
+  }
+}
+
+function clearCalImport() {
+  _calImportData = [];
+  document.getElementById('cal-import-preview').style.display = 'none';
+  document.getElementById('cal-import-btn').style.display = 'none';
+  document.getElementById('cal-import-file').value = '';
+}
+
+async function runCalendarImport() {
+  if (!_calImportData.length) { toast('No events to import', 'warning'); return; }
+  const btn = document.getElementById('cal-import-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Importing...';
+  try {
+    const res = await fetch('/api/calendar/bulk', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(_calImportData)
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Import failed');
+    closeModal('cal-import-modal');
+    toast(`${result.imported} event${result.imported!==1?'s':''} imported successfully!`, 'success');
+    loadCalendar();
+  } catch(err) {
+    toast(`Import failed: ${err.message}`, 'danger');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa fa-file-import"></i> Import Events';
+  }
+}
+
 // ─── EXPENSES ────────────────────────────────────────────────────────────────
 let _editExpenseId = null;
 async function loadExpenses() {

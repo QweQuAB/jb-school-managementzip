@@ -470,7 +470,13 @@ tr:hover td{background:#f8fafc}
 
     <!-- CALENDAR -->
     <div id="section-calendar" class="section">
-      <div class="page-header"><h3><i class="fa fa-calendar-alt"></i> Academic Calendar</h3><button class="btn btn-primary" onclick="openModal('event-modal','')"><i class="fa fa-plus"></i> Add Event</button></div>
+      <div class="page-header">
+        <h3><i class="fa fa-calendar-alt"></i> Academic Calendar</h3>
+        <div class="actions">
+          <button class="btn btn-outline" onclick="openCalendarImport()"><i class="fa fa-file-import"></i> <span>Bulk Import</span></button>
+          <button class="btn btn-primary" onclick="openModal('event-modal','')"><i class="fa fa-plus"></i> <span>Add Event</span></button>
+        </div>
+      </div>
       <div class="card card-body">
         <div class="cal-nav">
           <button class="btn btn-outline btn-sm" onclick="calPrev()"><i class="fa fa-chevron-left"></i></button>
@@ -946,6 +952,100 @@ tr:hover td{background:#f8fafc}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('fee-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveFee()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Calendar Bulk Import Modal -->
+<div class="modal-overlay" id="cal-import-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fa fa-file-import" style="color:var(--blue)"></i> Bulk Import Calendar Events</h3>
+      <button class="modal-close" onclick="closeModal('cal-import-modal')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+
+      <!-- Step 1: Template -->
+      <div style="background:#f0f7ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+          <div>
+            <div style="font-weight:700;font-size:.9rem;color:#1e40af"><i class="fa fa-lightbulb"></i> Step 1 — Get the Template</div>
+            <div style="font-size:.78rem;color:#3b82f6;margin-top:2px">Copy the template below, fill in your events, save as a <code>.json</code> file, then upload it.</div>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-sm btn-outline" onclick="copyCalendarTemplate()"><i class="fa fa-copy"></i> Copy</button>
+            <button class="btn btn-sm btn-primary" onclick="downloadCalendarTemplate()"><i class="fa fa-download"></i> Download</button>
+          </div>
+        </div>
+        <pre id="cal-template-box" style="background:#1e293b;color:#e2e8f0;border-radius:8px;padding:14px;font-size:.74rem;overflow-x:auto;max-height:260px;overflow-y:auto;line-height:1.6;margin:0;white-space:pre"></pre>
+      </div>
+
+      <!-- Field Reference -->
+      <details style="margin-bottom:18px">
+        <summary style="cursor:pointer;font-size:.82rem;font-weight:600;color:var(--muted);padding:4px 0">
+          <i class="fa fa-info-circle"></i> Field Reference (click to expand)
+        </summary>
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:.78rem">
+            <strong style="color:var(--text)">title</strong> <span style="color:var(--red);font-size:.72rem">required</span><br>
+            <span style="color:var(--muted)">Name of the event. Any text.</span>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:.78rem">
+            <strong style="color:var(--text)">startDate</strong> <span style="color:var(--red);font-size:.72rem">required</span><br>
+            <span style="color:var(--muted)">Format: <code>YYYY-MM-DD</code> e.g. <code>2025-09-01</code></span>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:.78rem">
+            <strong style="color:var(--text)">endDate</strong> <span style="color:var(--muted);font-size:.72rem">optional</span><br>
+            <span style="color:var(--muted)">Same format. Leave blank for single-day events.</span>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:.78rem">
+            <strong style="color:var(--text)">type</strong> <span style="color:var(--muted);font-size:.72rem">optional</span><br>
+            <span style="color:var(--muted)">Holiday · Exam · Meeting · Sports · Parents Day · Speech Day · Event · Other</span>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:.78rem">
+            <strong style="color:var(--text)">term</strong> <span style="color:var(--muted);font-size:.72rem">optional</span><br>
+            <span style="color:var(--muted)">Term 1 · Term 2 · Term 3</span>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:.78rem">
+            <strong style="color:var(--text)">year</strong> <span style="color:var(--muted);font-size:.72rem">optional</span><br>
+            <span style="color:var(--muted)">Academic year number e.g. <code>2025</code></span>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:.78rem">
+            <strong style="color:var(--text)">color</strong> <span style="color:var(--muted);font-size:.72rem">optional</span><br>
+            <span style="color:var(--muted)">Hex color e.g. <code>#ef4444</code>. Auto-set from type if omitted.</span>
+          </div>
+          <div style="background:var(--bg);border-radius:8px;padding:10px;font-size:.78rem">
+            <strong style="color:var(--text)">description</strong> <span style="color:var(--muted);font-size:.72rem">optional</span><br>
+            <span style="color:var(--muted)">Any extra notes about the event.</span>
+          </div>
+        </div>
+      </details>
+
+      <!-- Step 2: Upload -->
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:14px">
+        <div style="font-weight:700;font-size:.9rem;color:#15803d;margin-bottom:10px"><i class="fa fa-upload"></i> Step 2 — Upload your JSON file</div>
+        <label id="cal-drop-zone" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed #86efac;border-radius:10px;padding:28px;cursor:pointer;background:#fff;transition:background .15s;gap:6px" ondragover="event.preventDefault();this.style.background='#dcfce7'" ondragleave="this.style.background='#fff'" ondrop="handleCalDrop(event)">
+          <i class="fa fa-file-code" style="font-size:2rem;color:#22c55e"></i>
+          <span style="font-weight:600;color:var(--text);font-size:.9rem">Drag &amp; drop your JSON file here</span>
+          <span style="font-size:.78rem;color:var(--muted)">or click to browse</span>
+          <input type="file" id="cal-import-file" accept=".json,application/json" style="display:none" onchange="handleCalFileSelect(this)">
+        </label>
+        <div id="cal-import-preview" style="display:none;margin-top:12px">
+          <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--white);border:1px solid var(--border);border-radius:8px;margin-bottom:10px">
+            <i class="fa fa-file-alt" style="color:var(--green)"></i>
+            <span id="cal-import-filename" style="flex:1;font-size:.85rem;font-weight:500"></span>
+            <span id="cal-import-count" class="badge badge-green"></span>
+            <button onclick="clearCalImport()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:.8rem"><i class="fa fa-times"></i></button>
+          </div>
+          <div id="cal-import-errors" style="display:none"></div>
+          <div id="cal-import-table-wrap" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;overflow-x:auto"></div>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('cal-import-modal')">Cancel</button>
+      <button class="btn btn-primary" id="cal-import-btn" onclick="runCalendarImport()" style="display:none"><i class="fa fa-file-import"></i> Import Events</button>
     </div>
   </div>
 </div>
