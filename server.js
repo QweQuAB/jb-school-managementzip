@@ -771,6 +771,81 @@ app.get('/api/export',(req,res)=>{
   res.json(data);
 });
 
+// ─── Import ───────────────────────────────────────────────────────────────────
+app.post('/api/import',(req,res)=>{
+  const data=req.body;
+  if(!data||typeof data!=='object') return res.status(400).json({error:'Invalid import data'});
+  const results={};
+  const errors=[];
+
+  function tryImport(table,rows,insertFn){
+    if(!Array.isArray(rows)||rows.length===0){results[table]=0;return;}
+    let n=0;
+    const t=db.transaction(()=>{rows.forEach(r=>{try{insertFn(r);n++;}catch(e){errors.push(`${table}#${r.id}: ${e.message}`);}});});
+    try{t();}catch(e){errors.push(`${table} batch: ${e.message}`);}
+    results[table]=n;
+  }
+
+  tryImport('students',data.students,r=>{
+    db.prepare(`INSERT OR IGNORE INTO students(id,admNo,firstName,lastName,otherName,gender,dob,classId,admDate,status,parent,contact,address,photo)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`).run(r.id,r.admNo||'',r.firstName||'',r.lastName||'',r.otherName||'',r.gender||'',r.dob||'',r.classId||null,r.admDate||'',r.status||'Active',r.parent||'',r.contact||'',r.address||'',r.photo||'');
+  });
+  tryImport('teachers',data.teachers,r=>{
+    db.prepare(`INSERT OR IGNORE INTO teachers(id,staffId,firstName,lastName,gender,qualification,phone,role,subjectId,status,dateJoined,specialization)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`).run(r.id,r.staffId||'',r.firstName||'',r.lastName||'',r.gender||'',r.qualification||'',r.phone||'',r.role||'',r.subjectId||null,r.status||'Active',r.dateJoined||'',r.specialization||'');
+  });
+  tryImport('classes',data.classes,r=>{
+    db.prepare(`INSERT OR IGNORE INTO classes(id,name,level,capacity,teacherId,teacher2Id)
+      VALUES(?,?,?,?,?,?)`).run(r.id,r.name||'',r.level||'',r.capacity||40,r.teacherId||null,r.teacher2Id||null);
+  });
+  tryImport('subjects',data.subjects,r=>{
+    db.prepare(`INSERT OR IGNORE INTO subjects(id,code,name,category,teacherId)
+      VALUES(?,?,?,?,?)`).run(r.id,r.code||'',r.name||'',r.category||'Core',r.teacherId||null);
+  });
+  tryImport('assessments',data.assessments,r=>{
+    db.prepare(`INSERT OR IGNORE INTO assessments(id,studentId,subjectId,classId,term,year,test1,test2,exam,total,grade)
+      VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(r.id,r.studentId,r.subjectId,r.classId||null,r.term||'',r.year||'',r.test1||0,r.test2||0,r.exam||0,r.total||0,r.grade||'');
+  });
+  tryImport('fees',data.fees,r=>{
+    db.prepare(`INSERT OR IGNORE INTO fees(id,studentId,term,year,billed,paid,balance,method,notes)
+      VALUES(?,?,?,?,?,?,?,?,?)`).run(r.id,r.studentId,r.term||'',r.year||'',r.billed||0,r.paid||0,r.balance||0,r.method||'Cash',r.notes||'');
+  });
+  tryImport('attendance',data.attendance,r=>{
+    db.prepare(`INSERT OR IGNORE INTO attendance(id,studentId,classId,date,status,remarks)
+      VALUES(?,?,?,?,?,?)`).run(r.id,r.studentId,r.classId||null,r.date||'',r.status||'Present',r.remarks||'');
+  });
+  tryImport('expenses',data.expenses,r=>{
+    db.prepare(`INSERT OR IGNORE INTO expenses(id,category,amount,date,description,approvedBy)
+      VALUES(?,?,?,?,?,?)`).run(r.id,r.category||'Other',r.amount||0,r.date||'',r.description||'',r.approvedBy||'');
+  });
+  tryImport('inventory',data.inventory,r=>{
+    db.prepare(`INSERT OR IGNORE INTO inventory(id,name,category,quantity,minStock,condition,location,dateAcquired,notes)
+      VALUES(?,?,?,?,?,?,?,?,?)`).run(r.id,r.name||'',r.category||'Other',r.quantity||0,r.minStock||0,r.condition||'Good',r.location||'',r.dateAcquired||'',r.notes||'');
+  });
+  tryImport('scholarships',data.scholarships,r=>{
+    db.prepare(`INSERT OR IGNORE INTO scholarships(id,studentId,type,sponsor,startDate,endDate,status,benefits,notes)
+      VALUES(?,?,?,?,?,?,?,?,?)`).run(r.id,r.studentId,r.type||'',r.sponsor||'',r.startDate||'',r.endDate||'',r.status||'Active',r.benefits||'',r.notes||'');
+  });
+  // Merge settings (non-destructive: only set keys not already present)
+  if(data.settings&&Array.isArray(data.settings)){
+    let settingsImported=0;
+    data.settings.forEach(s=>{
+      try{db.prepare('INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)').run(s.key,s.value);settingsImported++;}catch(e){}
+    });
+    results.settings=settingsImported;
+  }
+
+  // Rebuild counters from max IDs
+  try{
+    const maxStu=db.prepare('SELECT MAX(id) as m FROM students').get().m||0;
+    const maxTch=db.prepare('SELECT MAX(id) as m FROM teachers').get().m||0;
+    const upsert=db.prepare('INSERT INTO counters(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=MAX(excluded.value,value)');
+    upsert.run('student_seq',maxStu); upsert.run('teacher_seq',maxTch);
+  }catch(e){}
+
+  res.json({ok:true,results,errors:errors.slice(0,20)});
+});
+
 // ─── Fallback ────────────────────────────────────────────────────────────────
 app.get('/{*path}',(req,res)=>res.sendFile(path.join(__dirname,'school-system','public','index.html')));
 app.use((err,req,res,next)=>{console.error('API Error:',err.message);res.status(500).json({error:err.message});});

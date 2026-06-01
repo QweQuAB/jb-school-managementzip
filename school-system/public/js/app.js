@@ -1337,10 +1337,86 @@ async function wizNext() {
 
 function wizBack() { if (_wizStep > 0) { _wizStep--; renderWizardStep(); } }
 
-// ─── DATA EXPORT / RESET ─────────────────────────────────────────────────────
+// ─── DATA EXPORT / RESET / IMPORT ────────────────────────────────────────────
 function exportData() { window.location.href = '/api/export'; }
 async function resetData() {
   toast('Reset not implemented in demo mode', 'warning');
+}
+
+let _impData = null;
+
+function handleImpDrop(e) {
+  e.preventDefault();
+  const dz = document.getElementById('imp-drop-zone');
+  if (dz) dz.style.background = 'var(--bg)';
+  const file = e.dataTransfer?.files[0];
+  if (file) processImpFile(file);
+}
+
+function handleImpFileSelect(input) {
+  const file = input.files[0];
+  if (file) processImpFile(file);
+}
+
+function processImpFile(file) {
+  if (!file.name.endsWith('.json')) { toast('Please select a .json export file', 'danger'); return; }
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      _impData = data;
+      const tables = ['students','teachers','classes','subjects','assessments','fees','attendance','expenses','inventory','scholarships'];
+      const summary = document.getElementById('imp-summary');
+      const errors = document.getElementById('imp-errors');
+      summary.innerHTML = tables.map(t => {
+        const arr = data[t];
+        const n = Array.isArray(arr) ? arr.length : 0;
+        return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">${t}</div>
+          <div style="font-size:20px;font-weight:700;color:${n>0?'var(--primary)':'var(--text-muted)'};margin-top:2px">${n}</div>
+          <div style="font-size:10px;color:var(--text-muted)">record${n===1?'':'s'}</div>
+        </div>`;
+      }).join('');
+      errors.innerHTML = '';
+      document.getElementById('imp-filename').textContent = file.name;
+      document.getElementById('imp-preview').style.display = 'block';
+      document.getElementById('imp-confirm-btn').style.display = 'block';
+    } catch (err) {
+      toast('Could not parse JSON — is this a valid export file?', 'danger');
+    }
+  };
+  reader.readAsText(file);
+}
+
+function clearImpFile() {
+  _impData = null;
+  document.getElementById('imp-preview').style.display = 'none';
+  document.getElementById('imp-confirm-btn').style.display = 'none';
+  document.getElementById('imp-file-input').value = '';
+}
+
+async function runDataImport() {
+  if (!_impData) return;
+  if (!confirm('Import data from this file? New records will be added alongside existing ones. This cannot be undone.')) return;
+  try {
+    const result = await API.post('/api/import', _impData);
+    const totals = Object.entries(result.results || {}).map(([k,v]) => `${k}: ${v}`).join(', ');
+    toast(`Import complete — ${totals}`, 'success');
+    if (result.errors && result.errors.length) {
+      console.warn('Import errors:', result.errors);
+      toast(`${result.errors.length} row(s) skipped (already exist or invalid)`, 'warning');
+    }
+    closeModal('data-import-modal');
+    clearImpFile();
+    // Refresh global data
+    [_teachers, _classes, _subjects, _students] = await Promise.all([
+      API.get('/api/teachers'), API.get('/api/classes'), API.get('/api/subjects'), API.get('/api/students')
+    ]);
+    populateClassDropdowns(); populateTeacherDropdowns(); populateSubjectDropdowns(); populateAllStudentDropdowns();
+    loadDashboard();
+  } catch (err) {
+    toast('Import failed — ' + err.message, 'danger');
+  }
 }
 
 // ─── POPULATE DROPDOWNS ──────────────────────────────────────────────────────

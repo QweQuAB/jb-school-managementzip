@@ -465,7 +465,6 @@ tr:hover td{background:#f8fafc}
       <div class="page-header">
         <h3><i class="fa fa-table"></i> Timetable</h3>
         <div class="actions">
-          <button class="btn btn-outline" onclick="TT.renderTimetableView()"><i class="fa fa-eye"></i> View</button>
           <button class="btn btn-primary" onclick="TT.generateAndSave()"><i class="fa fa-magic"></i> Generate</button>
         </div>
       </div>
@@ -802,6 +801,7 @@ tr:hover td{background:#f8fafc}
         <h4 style="margin-bottom:12px">Data Management</h4>
         <div style="display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-outline" onclick="exportData()"><i class="fa fa-download"></i> Export All Data (JSON)</button>
+          <button class="btn btn-secondary" onclick="openModal('data-import-modal')"><i class="fa fa-file-import"></i> Import Data (JSON)</button>
           <button class="btn btn-danger" onclick="if(confirm('DELETE all school data? This cannot be undone.'))resetData()"><i class="fa fa-trash"></i> Reset Database</button>
         </div>
       </div></div>
@@ -1006,6 +1006,112 @@ tr:hover td{background:#f8fafc}
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('fee-modal')">Cancel</button>
       <button class="btn btn-primary" onclick="saveFee()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Teacher Timetable Config Modal -->
+<div class="modal-overlay" id="ttTeacherModal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fa fa-chalkboard-teacher" style="color:var(--blue)"></i> Teacher Timetable Configuration</h3>
+      <button class="modal-close" onclick="closeModal('ttTeacherModal')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="ttm-editId">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Teacher *</label>
+          <select class="form-control" id="ttm-teacher"></select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Employment Type</label>
+          <select class="form-control" id="ttm-type">
+            <option value="Full-time">Full-time (Permanent)</option>
+            <option value="Part-time">Part-time</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Available Days <span style="color:var(--text-muted);font-weight:400;font-size:.78rem">— uncheck days a part-time teacher doesn't come in</span></label>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:6px;padding:12px;background:var(--bg);border-radius:8px;border:1px solid var(--border)">
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none"><input type="checkbox" id="ttm-day-Mon" checked style="width:auto"> Monday</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none"><input type="checkbox" id="ttm-day-Tue" checked style="width:auto"> Tuesday</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none"><input type="checkbox" id="ttm-day-Wed" checked style="width:auto"> Wednesday</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none"><input type="checkbox" id="ttm-day-Thu" checked style="width:auto"> Thursday</label>
+          <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;user-select:none"><input type="checkbox" id="ttm-day-Fri" checked style="width:auto"> Friday</label>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Max Teaching Periods Per Day</label>
+          <input class="form-control" type="number" id="ttm-maxPeriods" value="6" min="1" max="12">
+        </div>
+        <div class="form-group" style="display:flex;align-items:center;gap:10px;padding-top:26px">
+          <input type="checkbox" id="ttm-isClassTeacher" onchange="TT.onClassTeacherToggle(this)" style="width:auto;cursor:pointer">
+          <label for="ttm-isClassTeacher" style="margin:0;cursor:pointer;font-size:.85rem;font-weight:500">This teacher is a Class Teacher</label>
+        </div>
+      </div>
+      <div id="ttm-classTeacherRow" style="display:none" class="form-group">
+        <label class="form-label">Class Teacher Of</label>
+        <select class="form-control" id="ttm-classTeacher"></select>
+      </div>
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--border)">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <div style="font-weight:600;font-size:.88rem">Subject Assignments</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">Which classes and subjects does this teacher teach, and how many periods per week?</div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="TT.addAssignmentRow()"><i class="fa fa-plus"></i> Add Row</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 100px 36px;gap:8px;margin-bottom:6px;padding:0 2px">
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.05em">CLASS</div>
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.05em">SUBJECT</div>
+          <div style="font-size:10px;font-weight:700;color:var(--text-muted);letter-spacing:.05em">PERIODS/WK</div>
+          <div></div>
+        </div>
+        <div id="ttm-assignments" style="max-height:240px;overflow-y:auto"></div>
+        <div style="font-size:.73rem;color:var(--text-muted);margin-top:8px"><i class="fa fa-info-circle"></i> A class teacher can also have rows here for subjects they teach in <em>other</em> classes.</div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('ttTeacherModal')">Cancel</button>
+      <button class="btn btn-primary" onclick="TT.saveTeacherConfig()"><i class="fa fa-save"></i> Save Configuration</button>
+    </div>
+  </div>
+</div>
+
+<!-- Data Import Modal -->
+<div class="modal-overlay" id="data-import-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fa fa-file-import" style="color:var(--blue)"></i> Import School Data</h3>
+      <button class="modal-close" onclick="closeModal('data-import-modal')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px;margin-bottom:16px;font-size:.83rem">
+        <strong style="color:#1e40af"><i class="fa fa-lightbulb"></i> How it works</strong><br>
+        Upload a JSON file previously exported from this system (or any compatible backup). Existing records are kept; only <strong>new</strong> records (by ID) are inserted. Settings will be merged — your current settings are not erased.
+      </div>
+      <label id="imp-drop-zone" style="display:flex;flex-direction:column;align-items:center;justify-content:center;border:2px dashed var(--border);border-radius:10px;padding:32px;cursor:pointer;background:var(--bg);transition:background .15s;gap:8px" ondragover="event.preventDefault();this.style.background='#f0f9ff'" ondragleave="this.style.background='var(--bg)'" ondrop="handleImpDrop(event)">
+        <i class="fa fa-cloud-upload-alt" style="font-size:2.2rem;color:var(--blue)"></i>
+        <span style="font-weight:600;font-size:.9rem">Drag &amp; drop your JSON export file here</span>
+        <span style="font-size:.78rem;color:var(--text-muted)">or click to browse</span>
+        <input type="file" id="imp-file-input" accept=".json,application/json" style="display:none" onchange="handleImpFileSelect(this)">
+      </label>
+      <div id="imp-preview" style="display:none;margin-top:14px">
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--white);border:1px solid var(--border);border-radius:8px;margin-bottom:12px">
+          <i class="fa fa-file-alt" style="color:var(--success)"></i>
+          <span id="imp-filename" style="flex:1;font-size:.85rem;font-weight:500"></span>
+          <button onclick="clearImpFile()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:.85rem"><i class="fa fa-times"></i></button>
+        </div>
+        <div id="imp-summary" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px"></div>
+        <div id="imp-errors" style="margin-top:10px"></div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('data-import-modal')">Cancel</button>
+      <button class="btn btn-primary" id="imp-confirm-btn" style="display:none" onclick="runDataImport()"><i class="fa fa-file-import"></i> Import Data</button>
     </div>
   </div>
 </div>
