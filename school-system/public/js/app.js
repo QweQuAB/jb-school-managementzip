@@ -82,7 +82,7 @@ const sectionTitles = {
   arrears: ['Arrears', 'Students with outstanding fee balances'],
   expenses: ['Expense Tracker', 'Record and track school expenses'],
   'petty-cash': ['Petty Cash Log', 'Track petty cash transactions'],
-  billing: ['Billing Assistant', 'Connect to external billing system'],
+  billing: ['Bill Generator', 'Generate and print student fee bills'],
   inventory: ['Inventory', 'School assets and inventory tracking'],
   notices: ['Notice Board', 'School announcements and notices'],
   grading: ['Grading Rules', 'Manage grade boundary definitions'],
@@ -101,6 +101,8 @@ function navigate(section) {
   document.getElementById('tb-page-title').textContent = title;
   document.getElementById('tb-page-sub').textContent = sub;
   document.getElementById('search-results').style.display = 'none';
+  // Toggle billing full-height mode
+  document.getElementById('content').classList.toggle('billing-active', section === 'billing');
   // Mobile: close sidebar & sync bottom nav
   if (window.innerWidth <= 768) {
     closeSidebar();
@@ -953,21 +955,7 @@ async function loadAudit() {
   </tr>`).join('') || '<tr><td colspan="5"><div class="empty-state" style="padding:30px"><i class="fa fa-history"></i><h4>No audit records</h4></div></td></tr>';
 }
 
-// ─── BILLING ────────────────────────────────────────────────────────────────
-function setupBilling() {
-  const url = _settings.billingAppUrl;
-  const el = document.getElementById('billing-content');
-  if (url) {
-    el.innerHTML = `<div style="text-align:center;padding:40px">
-      <i class="fa fa-cash-register" style="font-size:3rem;color:var(--blue);margin-bottom:16px"></i>
-      <h3 style="margin-bottom:8px">Billing Assistant Connected</h3>
-      <p style="color:var(--muted);margin-bottom:20px">${url}</p>
-      <a href="${url}" target="_blank" class="btn btn-primary"><i class="fa fa-external-link-alt"></i> Open Billing Assistant</a>
-    </div>`;
-  } else {
-    el.innerHTML = `<div class="empty-state"><i class="fa fa-cash-register"></i><h4>No Billing App Connected</h4><p>Go to Settings → Academic and enter your Billing Assistant URL</p><button class="btn btn-primary" onclick="navigate('settings')" style="margin-top:12px">Open Settings</button></div>`;
-  }
-}
+// ─── BILLING — handled by billing.js (setupBilling defined there) ─────────────
 
 // ─── SEARCH ──────────────────────────────────────────────────────────────────
 const sectionIcons = { student:'user-graduate', teacher:'chalkboard-teacher', class:'door-open', subject:'book', expense:'wallet', inventory:'boxes', announcement:'bullhorn', event:'calendar-alt' };
@@ -1249,11 +1237,19 @@ const wizSteps = [
       </div>`
   },
   {
-    title: 'Billing Integration', sub: 'Step 4 of 4 — Optional billing connection',
+    title: "You're All Set!", sub: 'Step 4 of 4 — Setup complete',
     render: () => `
-      <h3>Billing Assistant</h3>
-      <p style="color:var(--muted);font-size:.85rem;margin-bottom:16px">Optionally connect your external billing app. You can skip this step.</p>
-      <div class="form-group"><label class="form-label">Billing App URL</label><input class="form-control" id="wiz-billingAppUrl" value="${_settings.billingAppUrl||''}" placeholder="https://your-billing-app.replit.app"></div>`
+      <div style="text-align:center;padding:12px 0">
+        <div style="font-size:3rem;margin-bottom:16px">🎉</div>
+        <h3 style="margin-bottom:10px">Setup Complete!</h3>
+        <p style="color:var(--muted);font-size:.88rem;line-height:1.65">Your school management system is ready. You can update any of these settings at any time from the <strong>Settings</strong> page.</p>
+        <div style="background:var(--bg);border-radius:10px;padding:14px;margin-top:18px;text-align:left;font-size:.83rem;line-height:1.8">
+          <div>🏫 <strong>${_settings.schoolName||'School'}</strong></div>
+          <div>📅 Term ${_settings.currentTerm||'3'} · ${_settings.academicYear||'—'}</div>
+          <div>💰 Standard Fee: ${_settings.currency||'GH¢'}${_settings.standardFee||'0'}</div>
+        </div>
+        <p style="color:var(--muted);font-size:.8rem;margin-top:14px">💡 Use the <strong>Billing</strong> section to generate and print student fee bills.</p>
+      </div>`
   }
 ];
 

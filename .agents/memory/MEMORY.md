@@ -1,0 +1,1 @@
+- [Billing sub-app](billing-module.md) — full bill generator in billing.js; localStorage only (BILL_KEY); setupBilling() entry point; must load billing.js before app.js.
