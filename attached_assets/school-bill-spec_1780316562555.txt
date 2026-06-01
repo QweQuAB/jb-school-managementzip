@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>School Bill Generator — Complete Recreation Spec</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, sans-serif; font-size: 14px; line-height: 1.65; color: #1a1a2e; background: #f8fafc; }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 40px 28px; }
+  h1 { font-size: 28px; font-weight: 800; color: #0B1120; margin-bottom: 6px; }
+  .tagline { color: #64748B; font-size: 14px; margin-bottom: 36px; }
+  h2 { font-size: 19px; font-weight: 700; color: #0B1120; border-left: 4px solid #0EA5E9; padding-left: 12px; margin: 36px 0 14px; }
+  h3 { font-size: 14.5px; font-weight: 700; color: #334155; margin: 20px 0 8px; }
+  h4 { font-size: 13px; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: .06em; margin: 14px 0 6px; }
+  p { margin-bottom: 10px; color: #334155; }
+  ul, ol { padding-left: 20px; margin-bottom: 12px; }
+  li { margin-bottom: 4px; color: #334155; }
+  code { background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 4px; padding: 1px 6px; font-family: 'Courier New', monospace; font-size: 12.5px; color: #0F172A; }
+  pre { background: #0B1120; color: #E2E8F0; border-radius: 10px; padding: 18px 20px; overflow-x: auto; font-size: 12px; line-height: 1.7; margin: 12px 0 18px; }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+  table { width: 100%; border-collapse: collapse; margin: 10px 0 18px; font-size: 13px; }
+  th { background: #F8FAFC; border: 1px solid #E2E8F0; padding: 8px 12px; text-align: left; font-weight: 700; color: #64748B; font-size: 11.5px; text-transform: uppercase; letter-spacing: .04em; }
+  td { border: 1px solid #E2E8F0; padding: 7px 12px; color: #334155; vertical-align: top; }
+  .chip { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 11.5px; font-weight: 600; margin: 2px 3px 2px 0; }
+  .swatch { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: middle; margin-right: 4px; border: 1px solid rgba(0,0,0,.12); }
+  .card { background: #fff; border: 1px solid #E2E8F0; border-radius: 12px; padding: 20px 22px; margin: 12px 0; }
+  .note { background: #FFF7ED; border: 1px solid #FED7AA; border-radius: 8px; padding: 10px 14px; font-size: 12.5px; color: #92400E; margin: 10px 0; }
+  .tip { background: #F0F9FF; border: 1px solid #BAE6FD; border-radius: 8px; padding: 10px 14px; font-size: 12.5px; color: #0369A1; margin: 10px 0; }
+  .section-divider { border: none; border-top: 2px solid #E2E8F0; margin: 40px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>📋 School Bill Generator — Complete Recreation Spec</h1>
+<p class="tagline">Every detail needed to rebuild this app from scratch in any framework.</p>
+
+<!-- ═══════════════════════════════ OVERVIEW ═══════════════════════════════ -->
+<h2>1. Overview &amp; Purpose</h2>
+<p>A <strong>frontend-only</strong> React + TypeScript web application that lets school administrators generate, configure, and print term fee bills for students. No backend, no database — everything is stored in <code>localStorage</code>. Bills are formatted for <strong>A4 print, 2 bills per page</strong> with a dashed cut-line between them.</p>
+
+<div class="card">
+  <h4>Core capabilities</h4>
+  <ul>
+    <li>Generate individual student bills with auto-calculated fees</li>
+    <li>Generate a 2-bill-per-A4-sheet print layout</li>
+    <li>Configure all fee items (label, amount, period, term), add/delete items</li>
+    <li>Configure feeding fees per class level per term</li>
+    <li>Configure transport zones with fees per level</li>
+    <li>School info, logo, bank payment details all editable</li>
+    <li>Bill appearance: logo size, watermark (text or image), background repeating-text pattern</li>
+    <li>Setup wizard for first-time use; admin wizard for full blank-slate setup</li>
+    <li>Export settings as JSON; import settings from JSON</li>
+    <li>Reset to defaults or wipe all data</li>
+    <li>All changes auto-saved to localStorage on every update</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════ TECH STACK ═══════════════════════════════ -->
+<h2>2. Tech Stack</h2>
+<table>
+  <tr><th>Concern</th><th>Choice</th></tr>
+  <tr><td>Framework</td><td>React 18 + TypeScript + Vite</td></tr>
+  <tr><td>Package manager</td><td>pnpm (monorepo workspace)</td></tr>
+  <tr><td>Styling</td><td>100% inline React styles — no CSS framework, no Tailwind, no styled-components</td></tr>
+  <tr><td>Persistence</td><td><code>localStorage</code> key <code>saSchoolBillSettings</code></td></tr>
+  <tr><td>State management</td><td>React Context (<code>SettingsContext</code>) + <code>useState</code></td></tr>
+  <tr><td>No backend</td><td>No API calls, no auth, no server</td></tr>
+  <tr><td>Print</td><td>Opens a new <code>window.open()</code> popup with injected HTML+CSS, then calls <code>window.print()</code></td></tr>
+</table>
+
+<h3>Google Fonts (loaded via &lt;link&gt; in app root)</h3>
+<pre><code>Inter: wght 300;400;500;600;700
+Playfair Display: wght 600;700
+Crimson Pro: ital,wght 0,400;0,600;1,400
+DM Sans: opsz,wght 9..40,300;9..40,400;9..40,500;9..40,600</code></pre>
+
+<!-- ═══════════════════════════════ DESIGN SYSTEM ═══════════════════════════════ -->
+<h2>3. Design System / Colours</h2>
+
+<h3>UI Chrome</h3>
+<table>
+  <tr><th>Token</th><th>Value</th><th>Usage</th></tr>
+  <tr><td>Sidebar bg</td><td><code>#0B1120</code></td><td>Left navigation sidebar</td></tr>
+  <tr><td>App bg</td><td><code>#F4F6F9</code></td><td>Main content background</td></tr>
+  <tr><td>Panel bg</td><td><code>#FFFFFF</code></td><td>Cards, header bar, settings sections</td></tr>
+  <tr><td>Border</td><td><code>#E2E8F0</code> / <code>#E8EDF2</code></td><td>Card borders, dividers</td></tr>
+  <tr><td>Accent blue</td><td><code>#0EA5E9</code></td><td>Primary buttons, active states</td></tr>
+  <tr><td>Accent bright</td><td><code>#38BDF8</code></td><td>Active nav item text &amp; left border</td></tr>
+  <tr><td>Sidebar gradient</td><td><code>linear-gradient(135deg,#22D3EE,#0EA5E9)</code></td><td>Logo icon box</td></tr>
+  <tr><td>Text primary</td><td><code>#0F172A</code></td><td>Headings, important values</td></tr>
+  <tr><td>Text secondary</td><td><code>#334155</code></td><td>Body text</td></tr>
+  <tr><td>Text muted</td><td><code>#64748B</code> / <code>#94A3B8</code></td><td>Labels, subtitles, hints</td></tr>
+  <tr><td>Nav inactive</td><td><code>#6B7280</code></td><td>Sidebar nav icons</td></tr>
+  <tr><td>Auto-save badge</td><td>bg <code>#F0FDF4</code>, border <code>#BBF7D0</code>, text <code>#15803D</code></td><td>Top-right header chip</td></tr>
+</table>
+
+<h3>Level Colours (pill tabs, dots, class badges)</h3>
+<table>
+  <tr><th>Level key</th><th>Label</th><th>Colour</th></tr>
+  <tr><td><code>creche</code></td><td>Crèche</td><td><span class="swatch" style="background:#06B6D4"></span><code>#06B6D4</code></td></tr>
+  <tr><td><code>nursery</code></td><td>Nursery</td><td><span class="swatch" style="background:#8B5CF6"></span><code>#8B5CF6</code></td></tr>
+  <tr><td><code>kg</code></td><td>Kindergarten</td><td><span class="swatch" style="background:#EC4899"></span><code>#EC4899</code></td></tr>
+  <tr><td><code>lp</code></td><td>Lower Primary</td><td><span class="swatch" style="background:#F59E0B"></span><code>#F59E0B</code></td></tr>
+  <tr><td><code>up</code></td><td>Upper Primary</td><td><span class="swatch" style="background:#10B981"></span><code>#10B981</code></td></tr>
+  <tr><td><code>jhs</code></td><td>JHS</td><td><span class="swatch" style="background:#3B82F6"></span><code>#3B82F6</code></td></tr>
+</table>
+
+<h3>Bill Document Colours (printed bill)</h3>
+<table>
+  <tr><th>Element</th><th>Value</th></tr>
+  <tr><td>School name / borders</td><td><code>#1B2D5B</code> (navy)</td></tr>
+  <tr><td>Cell borders in fee table</td><td><code>#444</code> (print) / <code>#555</code> (screen)</td></tr>
+  <tr><td>Total row background</td><td><code>#f8f8f6</code></td></tr>
+  <tr><td>Bill body font</td><td>Crimson Pro (serif), fallback Times New Roman</td></tr>
+  <tr><td>School name font</td><td>Playfair Display, uppercase, <code>#1B2D5B</code></td></tr>
+</table>
+
+<!-- ═══════════════════════════════ DATA MODEL ═══════════════════════════════ -->
+<h2>4. Data Model (TypeScript types)</h2>
+
+<pre><code>// localStorage key
+const STORAGE_KEY = 'saSchoolBillSettings';
+
+interface FeeItem {
+  id: string;         // unique string, e.g. 'tuition', 'item_1234567890'
+  label: string;      // displayed on bill, e.g. 'Tuition Fee'
+  amount: number;     // GH¢ amount
+  period: string;     // displayed in Period column, e.g. 'Per Term', 'Per Year', ''
+  terms: 'all' | '1' | '2' | '3'; // which term(s) this item appears in
+}
+
+interface LevelFees {
+  label: string;               // e.g. 'Lower Primary'
+  classes: string[];           // class names for this level, e.g. ['Lower Primary']
+  hasArrears: boolean;         // show arrears row on bill?
+  items: FeeItem[];            // fee line items
+  feeding: { '1': number; '2': number; '3': number }; // feeding fee per term
+}
+
+interface TransportZone {
+  id: string;    // 'ssnit', 'elmina', 'ankaful', 'quarters', 'ataabadze', 'none'
+  label: string; // display name
+  fees: { creche: number; nursery: number; kg: number; lp: number; up: number; jhs: number };
+}
+
+interface SchoolInfo {
+  name: string;        // e.g. 'St. Anne Catholic School'
+  subtitle: string;    // e.g. 'Nkontrodo, Elmina'
+  address: string;     // e.g. 'P.O. Box 58, Elmina, Central Region'
+  logo: string | null; // base64 data URL or null
+}
+
+interface AcademicInfo {
+  year: string;           // e.g. '2025-2026'
+  term: '1' | '2' | '3'; // current term
+  reopening: string;      // e.g. 'Monday, 7th September 2026'
+}
+
+interface BankInfo {
+  name: string;        // e.g. 'GCB Bank Ltd'
+  branch: string;      // e.g. 'Elmina Branch'
+  account: string;     // account number
+  accountName: string; // account holder name
+}
+
+interface WatermarkSettings {
+  enabled: boolean;
+  mode: 'text' | 'image';
+  text: string;          // e.g. 'OFFICIAL'
+  image: string | null;  // base64 data URL
+  opacity: number;       // 0-100 (shown as %, default 15)
+  rotation: number;      // degrees, default -35
+  size: number;          // % scale, default 100
+}
+
+interface BackgroundTextSettings {
+  enabled: boolean;
+  text: string;       // custom text; blank = use school name
+  fontSize: number;   // 5-20, default 8
+  opacity: number;    // 1-30 (as %, default 6)
+  color: string;      // hex, default '#1B2D5B'
+  spacing: number;    // 40-300, default 120 (SVG pattern tile width px)
+  rotation: number;   // -90 to 90, default -30
+}
+
+interface Settings {
+  school: SchoolInfo;
+  academic: AcademicInfo;
+  bank: BankInfo;
+  fees: {
+    creche: LevelFees;
+    nursery: LevelFees;
+    kg: LevelFees;
+    lp: LevelFees;
+    up: LevelFees;
+    jhs: LevelFees;
+  };
+  transport: TransportZone[];
+  logoSize?: number;               // 10-200, default 100 (%)
+  watermark?: WatermarkSettings;
+  background?: BackgroundTextSettings;
+  _blank?: boolean;                // true = all amounts are 0 (admin blank state)
+}
+
+type LevelKey = 'creche' | 'nursery' | 'kg' | 'lp' | 'up' | 'jhs';
+
+// Calculated bill (output of calcBill())
+interface BillResult {
+  name: string;
+  className: string;
+  classHeaderLabel: string;   // always 'Class:'
+  classHeaderDisplay: string; // same as className
+  term: string;
+  lv: LevelKey;
+  trId: string;               // transport zone id
+  items: { label: string; amount: number; period: string }[];
+  baseTotal: number;
+  varItems: { label: string; amount: number; period: string; zone?: string }[];
+  varTotal: number;
+  grandTotal: number;
+  arrears: number | null;
+  hasArrears: boolean;
+}</code></pre>
+
+<!-- ═══════════════════════════════ DEFAULT DATA ═══════════════════════════════ -->
+<h2>5. Default Data (pre-loaded values for St. Anne Catholic School)</h2>
+
+<div class="note">All amounts in GH¢. These are the defaults — the user can edit every value in Settings.</div>
+
+<h3>School / Academic / Bank defaults</h3>
+<pre><code>school.name    = "St. Anne Catholic School"
+school.subtitle = "Nkontrodo, Elmina"
+school.address  = "P.O. Box 58, Elmina, Central Region"
+school.logo     = null
+
+academic.year      = "2025-2026"
+academic.term      = "3"
+academic.reopening = ""
+
+bank.name        = "GCB Bank Ltd"
+bank.branch      = "Elmina Branch"
+bank.account     = "1234567890"
+bank.accountName = "St. Anne Catholic School"</code></pre>
+
+<h3>Fee Items by Level</h3>
+<table>
+  <tr><th>Level</th><th>Fee Item</th><th>Amount GH¢</th><th>Period</th><th>When</th></tr>
+  <!-- Crèche -->
+  <tr><td rowspan="7"><strong>Crèche</strong><br><code>creche</code><br>hasArrears: false<br>classes: ['Crèche']</td><td>Tuition Fee</td><td>320</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Stationary</td><td>5</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Maintenance</td><td>15</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Exams</td><td>10</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Books</td><td>180</td><td>(blank)</td><td>Term 1 only</td></tr>
+  <tr><td>PTA/ Building Funds</td><td>30</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <tr><td>Sports</td><td>15</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <!-- Nursery -->
+  <tr><td rowspan="7"><strong>Nursery</strong><br><code>nursery</code><br>hasArrears: false<br>classes: ['Nursery']</td><td>Tuition Fee</td><td>345</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Stationary</td><td>5</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Maintenance</td><td>20</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Exams</td><td>10</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Books</td><td>220</td><td>(blank)</td><td>Term 1 only</td></tr>
+  <tr><td>PTA/ Building Funds</td><td>30</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <tr><td>Sports</td><td>15</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <!-- KG -->
+  <tr><td rowspan="7"><strong>Kindergarten</strong><br><code>kg</code><br>hasArrears: false<br>classes: ['Kindergarten']</td><td>Tuition Fee</td><td>355</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Stationary</td><td>10</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Maintenance</td><td>20</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Exams</td><td>15</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Books</td><td>450</td><td>(blank)</td><td>Term 1 only</td></tr>
+  <tr><td>PTA/ Building Funds</td><td>30</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <tr><td>Sports</td><td>15</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <!-- LP -->
+  <tr><td rowspan="7"><strong>Lower Primary</strong><br><code>lp</code><br>hasArrears: true<br>classes: ['Lower Primary']</td><td>Tuition Fee</td><td>365</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Stationary</td><td>10</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Maintenance</td><td>30</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Exams</td><td>15</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Books</td><td>750</td><td>(blank)</td><td>Term 1 only</td></tr>
+  <tr><td>PTA/ Building Funds</td><td>30</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <tr><td>Sports</td><td>15</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <!-- UP -->
+  <tr><td rowspan="8"><strong>Upper Primary</strong><br><code>up</code><br>hasArrears: true<br>classes: ['Upper Primary']</td><td>Tuition Fee</td><td>410</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Stationary</td><td>10</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Maintenance</td><td>30</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Exams</td><td>20</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>I.C.T</td><td>10</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Books</td><td>870</td><td>(blank)</td><td>Term 1 only</td></tr>
+  <tr><td>PTA/ Building Funds</td><td>30</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <tr><td>Sports</td><td>15</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <!-- JHS -->
+  <tr><td rowspan="8"><strong>JHS</strong><br><code>jhs</code><br>hasArrears: true<br>classes: ['JHS']</td><td>Tuition Fee</td><td>500</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Exams</td><td>20</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Maintenance</td><td>40</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Stationary</td><td>10</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>I.C.T</td><td>10</td><td>Per Term</td><td>All</td></tr>
+  <tr><td>Books</td><td>1450</td><td>(blank)</td><td>Term 1 only</td></tr>
+  <tr><td>PTA/ Building Funds</td><td>30</td><td>Per Year</td><td>Term 2 only</td></tr>
+  <tr><td>Sports</td><td>15</td><td>Per Year</td><td>Term 2 only</td></tr>
+</table>
+
+<h3>Feeding Fees (GH¢ per term, per level)</h3>
+<table>
+  <tr><th>Level</th><th>Term 1</th><th>Term 2</th><th>Term 3</th></tr>
+  <tr><td>Crèche</td><td>490</td><td>420</td><td>490</td></tr>
+  <tr><td>Nursery</td><td>490</td><td>420</td><td>490</td></tr>
+  <tr><td>Kindergarten</td><td>490</td><td>420</td><td>490</td></tr>
+  <tr><td>Lower Primary</td><td>560</td><td>480</td><td>560</td></tr>
+  <tr><td>Upper Primary</td><td>595</td><td>540</td><td>595</td></tr>
+  <tr><td>JHS</td><td>595</td><td>540</td><td>595</td></tr>
+</table>
+
+<h3>Transport Zones (default)</h3>
+<table>
+  <tr><th>Zone</th><th>id</th><th>Cr</th><th>Nur</th><th>KG</th><th>LP</th><th>UP</th><th>JHS</th></tr>
+  <tr><td>SSNIT</td><td>ssnit</td><td>350</td><td>350</td><td>350</td><td>350</td><td>350</td><td>350</td></tr>
+  <tr><td>Elmina / Mental</td><td>elmina</td><td>420</td><td>420</td><td>420</td><td>420</td><td>420</td><td>420</td></tr>
+  <tr><td>Ankaful / Bronyibima</td><td>ankaful</td><td>580</td><td>580</td><td>650</td><td>580</td><td>580</td><td>580</td></tr>
+  <tr><td>Quarters</td><td>quarters</td><td>280</td><td>280</td><td>280</td><td>280</td><td>280</td><td>280</td></tr>
+  <tr><td>Ataabadze</td><td>ataabadze</td><td>650</td><td>650</td><td>650</td><td>650</td><td>650</td><td>650</td></tr>
+  <tr><td>No Transport</td><td>none</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr>
+</table>
+<p>The "No Transport" zone (id: <code>none</code>) always has GH¢ 0 fees and is NOT shown as a transport line on the printed bill.</p>
+
+<!-- ═══════════════════════════════ APP LAYOUT ═══════════════════════════════ -->
+<h2>6. App Layout &amp; Navigation</h2>
+
+<div class="card">
+  <h4>Overall shell</h4>
+  <p><code>display: flex; min-height: 100vh</code> — sidebar + main content side by side.</p>
+  <ul>
+    <li><strong>Sidebar</strong> (left, collapsible): <code>width: 230px</code> expanded, <code>64px</code> collapsed. Has a toggle button on the right edge (‹ / ›).</li>
+    <li><strong>Main</strong> (right, flex:1): top header bar (58px) + scrollable content area.</li>
+  </ul>
+</div>
+
+<h3>Sidebar structure</h3>
+<ul>
+  <li><strong>Logo area</strong> (top): sky blue gradient icon box (📋) + "School Billing / Assistant" text. Hidden text when collapsed.</li>
+  <li><strong>Nav items</strong>: 3 items. Active = sky-blue bg tint + left border + blue text. Hover = subtle white tint.</li>
+  <li><strong>Term card</strong> (bottom of nav): shows current term name + academic year + "Setup Wizard" button. Hidden when collapsed.</li>
+  <li><strong>Collapse toggle</strong>: small circle button absolutely positioned at right edge, bottom.</li>
+</ul>
+
+<h3>Navigation pages</h3>
+<table>
+  <tr><th>id</th><th>Icon</th><th>Label</th><th>Component</th></tr>
+  <tr><td>individual</td><td>◻</td><td>Individual Bill</td><td>GeneratorTab (mode='ind')</td></tr>
+  <tr><td>fullsheet</td><td>▤</td><td>Full Term Sheet</td><td>GeneratorTab (mode='full')</td></tr>
+  <tr><td>settings</td><td>⊙</td><td>Settings &amp; Fees</td><td>SettingsTab</td></tr>
+</table>
+
+<h3>Top header bar</h3>
+<p>White bar, 58px tall, shadow. Shows current page title + subtitle. Right side: green "All changes auto-saved" pill badge.</p>
+
+<!-- ═══════════════════════════════ BILL CALCULATOR ═══════════════════════════════ -->
+<h2>7. Bill Calculation Logic (<code>calcBill</code>)</h2>
+
+<pre><code>function calcBill(bdata: BillData, S: Settings): BillResult | null {
+  const { level, term, transport, arrears } = bdata;
+  const lvFees = S.fees[level];  // get the level's fee config
+
+  // 1. Fixed fee items — filter by term
+  //    Include item if: item.terms === 'all' OR item.terms === currentTerm
+  const items = lvFees.items.filter(it => it.terms === 'all' || it.terms === term);
+
+  // 2. baseTotal = sum of filtered items
+
+  // 3. Variable items (feeding + optional transport)
+  //    Feeding: lvFees.feeding[term]
+  //    Transport: only if trId !== 'none'
+  //      amount = trZone.fees[level]
+  //      period label = zoneName + " Per Term"
+
+  // 4. varTotal = feeding + transport
+  // 5. grandTotal = baseTotal + varTotal
+
+  // 6. Arrears — only if lvFees.hasArrears === true
+  //    value = parseFloat(bdata.arrears) || 0
+
+  // classHeaderLabel is always 'Class:'
+  // classHeaderDisplay is the className string
+
+  return { name, className, classHeaderLabel: 'Class:', term, lv, trId,
+           items, baseTotal, varItems, varTotal, grandTotal,
+           arrears (null if !hasArrears), hasArrears };
+}</code></pre>
+
+<!-- ═══════════════════════════════ GENERATOR TAB ═══════════════════════════════ -->
+<h2>8. Generator Tab (Bill Creator)</h2>
+
+<div class="card">
+  <h4>Layout</h4>
+  <p><code>display: flex; height: 100%</code> — left form panel (320px, min 280px) + right preview area (flex:1).</p>
+</div>
+
+<h3>Mode toggle (top of left panel)</h3>
+<p>Two pill buttons: <strong>1 Bill</strong> (individual) and <strong>Full Sheet (2)</strong>. Active = sky blue. Mode change also updates the sidebar nav.</p>
+
+<h3>Bill Form fields</h3>
+<table>
+  <tr><th>Field</th><th>Type</th><th>Notes</th></tr>
+  <tr><td>Student Name</td><td>text input</td><td>Free text, full width</td></tr>
+  <tr><td>Level</td><td>select</td><td>Options: Crèche, Nursery, Kindergarten, Lower Primary, Upper Primary, JHS. Changing level resets className to first class of new level.</td></tr>
+  <tr><td>Class</td><td>select</td><td>Only shown if the level has more than 1 class name. Options = level.classes array.</td></tr>
+  <tr><td>Transport Zone</td><td>select</td><td>All zones including "No Transport". Full width.</td></tr>
+  <tr><td>Term</td><td>select</td><td>1st Term / 2nd Term / 3rd Term. Defaults to S.academic.term.</td></tr>
+  <tr><td>Arrears (GH¢)</td><td>number input</td><td>Only shown if level.hasArrears === true. Min 0, step 0.01.</td></tr>
+</table>
+
+<h3>Right panel preview</h3>
+<ul>
+  <li><strong>Single mode</strong>: white card with level colour dot + level label + term. BillRenderer below.</li>
+  <li><strong>Sheet mode</strong>: two white cards stacked, labelled "Bill 1" and "Bill 2", each with their own BillRenderer preview.</li>
+  <li>Background: <code>#F4F6F9</code>, padding 28px.</li>
+</ul>
+
+<h3>Print Preview button</h3>
+<p>Full-width dark navy button (<code>#1B2D5B</code>) labelled "🖨 Print Preview". Opens PrintPreview modal.</p>
+
+<!-- ═══════════════════════════════ BILL RENDERER ═══════════════════════════════ -->
+<h2>9. Bill Renderer (document layout)</h2>
+
+<p>Renders the actual bill document. Used in both screen preview (<code>isPrint=false</code>) and inside the print window (<code>isPrint=true</code>). Accepts a <code>billId</code> prop (string/number) for unique SVG pattern IDs.</p>
+
+<div class="card">
+  <h4>Font sizing difference</h4>
+  <ul>
+    <li>Screen (<code>isPrint=false</code>): sizes in <code>px</code> — main text ~11.5–13px, small text ~10.5px</li>
+    <li>Print (<code>isPrint=true</code>): sizes in <code>pt</code> — main text ~8.5–11pt, small text ~7.5pt</li>
+  </ul>
+</div>
+
+<h3>Bill structure (top to bottom)</h3>
+
+<ol>
+  <li>
+    <strong>SVG Background Text Pattern</strong> (when <code>background.enabled</code>): position absolute, inset 0, zIndex 0. SVG <code>&lt;pattern&gt;</code> with <code>&lt;text&gt;</code> tiled across the full bill area. Pattern transform = <code>rotate(rotation)</code>. Unique patternId = <code>bgp-{billId}</code>.
+  </li>
+  <li>
+    <strong>Watermark overlay</strong> (when <code>watermark.enabled</code>): position absolute, centered, zIndex 0, pointer-events none. Either a large rotated text (Playfair Display, ~72px screen / ~52pt print scaled by size%) or an image. Both have configurable opacity and rotation.
+  </li>
+  <li>
+    <strong>Content wrapper</strong> (position relative, zIndex 1 — sits above overlays):
+    <ol type="a">
+      <li><strong>Letterhead</strong>: 3-column grid (left=school name+address, center=logo, right=bank details). Separated from body by <code>2px solid #1B2D5B</code> bottom border.</li>
+      <li><strong>Name row</strong>: "NAME" bold + underline input-style display + "Class:" + class value. Uses baseline flex with dashed underline for the name.</li>
+      <li><strong>Transport line</strong> (italic, small): "Transport: [zone name]" — only shown when transport is NOT "No Transport" (id !== 'none').</li>
+      <li><strong>Title</strong>: centered "Child's Bill" in Playfair Display italic.</li>
+      <li><strong>Fee table</strong> (4 columns: Description | GH¢ | Amount | Period):
+        <ul>
+          <li>Each fixed fee item = one row</li>
+          <li>Blank spacer row</li>
+          <li>TOTAL row (bold, light grey bg)</li>
+          <li>Feeding row</li>
+          <li>Transport row (only if transport zone selected, not 'none')</li>
+          <li>TOTAL row (bold, light grey bg) = grand total</li>
+          <li>ARREARS row (only if hasArrears=true) — shows value if &gt;0, else blank lines</li>
+        </ul>
+      </li>
+      <li><strong>Reopening footer</strong> (only if S.academic.reopening set): "School Reopens: [date]" centered italic, separated by top border.</li>
+    </ol>
+  </li>
+</ol>
+
+<h3>Logo rendering</h3>
+<ul>
+  <li>If <code>S.school.logo</code> is set: <code>&lt;img&gt;</code> with <code>maxHeight</code>/<code>maxWidth</code> scaled by <code>logoSizePct</code>.</li>
+  <li>If no logo: circular div with school initials (first letter of each word, max 2 chars), Playfair Display font, navy border.</li>
+</ul>
+
+<h3>Letterhead left column</h3>
+<ul>
+  <li>School name: Playfair Display, uppercase, letter-spacing .04em, <code>#1B2D5B</code>, ~13px/10pt</li>
+  <li>Subtitle (if set): bold, same size as body</li>
+  <li>Address (if set): bold, smaller</li>
+</ul>
+
+<h3>Letterhead right column (bank details)</h3>
+<p>Only rendered if bank name/account/accountName is set. Heading: "Payment Details" (uppercase, small, bold). Lines: Bank: name + branch, Acct. Name: name, Acct. No.: number.</p>
+
+<!-- ═══════════════════════════════ PRINT PREVIEW ═══════════════════════════════ -->
+<h2>10. Print Preview Modal</h2>
+
+<div class="card">
+  <h4>Modal shell</h4>
+  <p>Fixed overlay, semi-dark background <code>rgba(10,18,40,.85)</code>. Dark grey inner container (<code>#444</code>) with border-radius 12px. Max-width 740px, centered, scroll if tall.</p>
+</div>
+
+<h3>Header row</h3>
+<p>"Print Preview — A4 Sheet" (Playfair Display, white) + "Print / Save as PDF" button (navy) + "✕ Close" button (ghost white border). ESC key closes the modal.</p>
+
+<h3>A4 page structure</h3>
+<pre><code>/* Each A4 page: */
+width: 210mm
+min-height: 297mm
+display: flex; flex-direction: column
+padding: 8mm 12mm
+
+/* Each bill slot: */
+flex: 1 (each half gets equal space)
+padding: 3mm 0
+
+/* Dashed cut line between the two bills: */
+border-top: 1.5px dashed #aaa
+"✂ cut here" text centered on the line</code></pre>
+
+<h3>Print window injection</h3>
+<p>Copies the rendered HTML (via <code>printRef.current.innerHTML</code>) into a new <code>window.open()</code> popup. Injects Google Fonts link and <code>@page { size: A4; margin: 0 }</code> CSS. Calls <code>window.print()</code> after 500ms timeout, then closes window.</p>
+
+<!-- ═══════════════════════════════ SETTINGS TAB ═══════════════════════════════ -->
+<h2>11. Settings Tab</h2>
+
+<p>Scrollable column of <strong>Section</strong> cards. Each Section has a dark header with icon + title + optional right content, and a white body with 22px padding.</p>
+
+<h3>Section 1 — School Information</h3>
+<ul>
+  <li>School name (text input)</li>
+  <li>Subtitle / location (text input)</li>
+  <li>School address (text input)</li>
+  <li>School logo: upload PNG/JPG (max 1.5MB, stored as base64). Shows thumbnail if uploaded. "Remove Logo" button.</li>
+</ul>
+
+<h3>Section 2 — Academic Year &amp; Term</h3>
+<ul>
+  <li>Academic year (text input, e.g. "2025-2026")</li>
+  <li>Current term: 3-segment pill toggle (1st / 2nd / 3rd)</li>
+  <li>Reopening date (text input, e.g. "Monday, 7th September 2026")</li>
+</ul>
+
+<h3>Section 3 — Bill Appearance</h3>
+<ul>
+  <li><strong>Logo Size</strong>: range slider 10–200, default 100. Live preview label "%".</li>
+  <li><strong>Watermark</strong>: on/off toggle. Mode toggle (text vs image). Text input for watermark text. Image upload for watermark image. Opacity slider (0–100). Rotation slider (-180 to +180). Size slider (10–800).</li>
+</ul>
+
+<h3>Section 4 — Background Design</h3>
+<ul>
+  <li>Description: "Fills bill background with your school name repeated in a diagonal pattern — like security paper."</li>
+  <li>On/Off toggle (sky blue when on)</li>
+  <li>Repeating text input (blank = uses school name)</li>
+  <li>Font size slider: 5–20, default 8</li>
+  <li>Opacity slider: 1–30 (as %), default 6</li>
+  <li>Angle slider: -90 to +90, default -30</li>
+  <li>Spacing slider: 40–300, default 120 (pattern tile width)</li>
+  <li>Colour: 6 preset swatches + custom color picker</li>
+  <li>Live preview: 80px tall SVG pattern strip showing the effect in real time</li>
+  <li>All controls dim (opacity 0.4) when disabled</li>
+</ul>
+
+<h3>Section 5 — Fee Configuration</h3>
+<ul>
+  <li><strong>Level tabs</strong>: 6 pill buttons (Crèche, Nursery, Kindergarten, Lower Primary, Upper Primary, JHS), each in its level colour when active. Switching tab resets the table (uses <code>key={activeLv}</code> on the table element).</li>
+  <li>
+    <strong>Fee items table</strong> — 5 columns: Fee Item | Amount (GH¢) | Period Label | When Applied | (delete)
+    <ul>
+      <li>Fee Item: text input (editable inline)</li>
+      <li>Amount: number input (editable)</li>
+      <li>Period Label: text input (editable)</li>
+      <li>When Applied: select dropdown (All Terms / Term 1 only / Term 2 only / Term 3 only)</li>
+      <li>Delete: × button, red border, removes the row</li>
+    </ul>
+  </li>
+  <li><strong>"+ Add fee item" button</strong>: adds new row with defaults (label "New Fee", amount 0, period "Per Term", terms "all").</li>
+  <li>
+    <strong>Feeding fee section</strong> (below a "🍽 Feeding Fee — specific to [Level] class" divider):
+    <ul>
+      <li>3 rows: Feeding — Term 1, Feeding — Term 2, Feeding — Term 3</li>
+      <li>Each has an editable amount number input</li>
+      <li>Term badge shown in "When Applied" column</li>
+    </ul>
+  </li>
+  <li>Footer note: "Edit any field inline. Fee items appear on the bill in the order listed. Feeding fees are per term and specific to each class level."</li>
+</ul>
+
+<h3>Section 6 — Transport Zones</h3>
+<ul>
+  <li>Scrollable horizontal table</li>
+  <li>Columns: Zone name | Cr | Nur | KG | LP | UP | JHS</li>
+  <li>"No Transport" zone is filtered out of this table (id === 'none' is hidden)</li>
+  <li>All amount cells are editable number inputs (center-aligned)</li>
+  <li>Footer: "Day Student (no transport) is always GH¢ 0.00 and is not shown."</li>
+</ul>
+
+<h3>Section 7 — Bank Payment Details</h3>
+<p>4 text inputs in 2-column grid: Bank Name, Branch (full-width), Account Name, Account Number.</p>
+
+<h3>Section 8 — Import / Export / Reset</h3>
+<ul>
+  <li><strong>Export Settings</strong>: downloads the full settings object as <code>school-bill-settings.json</code></li>
+  <li><strong>Import Settings</strong>: file upload, reads JSON, merges with defaults, saves</li>
+  <li><strong>Reset to Defaults</strong>: restores all St. Anne defaults (with confirmation)</li>
+  <li><strong>Wipe All Data</strong>: sets all amounts to 0, clears school/bank info (admin reset — launches AdminSetupWizard)</li>
+</ul>
+
+<!-- ═══════════════════════════════ SETUP WIZARD ═══════════════════════════════ -->
+<h2>12. Setup Wizards</h2>
+
+<h3>SetupWizard — 6 steps (for returning users / first-time load)</h3>
+<p>Shown automatically on first load (no localStorage data found), or triggered by "Setup Wizard" button in sidebar.</p>
+<table>
+  <tr><th>Step</th><th>Title</th><th>Fields</th></tr>
+  <tr><td>1</td><td>Welcome</td><td>Info screen — describes the app. "Skip" or "Get Started →".</td></tr>
+  <tr><td>2</td><td>School Info</td><td>School Name, Subtitle/Town, Logo upload (optional)</td></tr>
+  <tr><td>3</td><td>Address &amp; Reopening</td><td>School Address, Reopening Date</td></tr>
+  <tr><td>4</td><td>Bank Details</td><td>Bank Name, Branch, Account Name, Account Number</td></tr>
+  <tr><td>5</td><td>Term Setup</td><td>Academic Year, Current Term (1st/2nd/3rd toggle)</td></tr>
+  <tr><td>6</td><td>You're All Set!</td><td>Summary of entered info. "Start Generating Bills →" closes wizard.</td></tr>
+</table>
+
+<h3>AdminSetupWizard — 7 steps (for blank/wiped state)</h3>
+<p>Shown automatically when <code>S._blank === true</code>. Covers everything in SetupWizard plus transport zones and fee amounts.</p>
+<table>
+  <tr><th>Step</th><th>Title</th><th>Fields</th></tr>
+  <tr><td>1</td><td>Admin Setup</td><td>Intro screen listing all 5 setup steps.</td></tr>
+  <tr><td>2</td><td>School Info</td><td>School Name, Subtitle, Full Address, Logo</td></tr>
+  <tr><td>3</td><td>Academic Year &amp; Term</td><td>Academic Year, Current Term, Reopening Date</td></tr>
+  <tr><td>4</td><td>Bank Payment Details</td><td>Bank Name, Branch, Account Name, Account Number</td></tr>
+  <tr><td>5</td><td>Transport Zones</td><td>Editable table: zone label + fee per level (Nur/KG/LP/UP/JHS). 'none' zone hidden.</td></tr>
+  <tr><td>6</td><td>Fee Amounts</td><td>Compact table per level: each fee item amount + feeding per term.</td></tr>
+  <tr><td>7</td><td>Setup Complete!</td><td>Summary. "Start Generating Bills →".</td></tr>
+</table>
+
+<h3>Wizard shell design</h3>
+<ul>
+  <li>Fixed overlay with <code>backdrop-filter: blur(6px)</code></li>
+  <li>Modal: white, 520px max-width, rounded (18px), shadow</li>
+  <li>Header: <code>#0B1120</code> bg with step progress dots (filled=sky blue, current=white, future=grey)</li>
+  <li>Close (✕) button top-right of header</li>
+  <li>Body: scrollable with 22px padding</li>
+  <li>Footer: Back/Next buttons. PrimaryBtn = sky blue gradient. GhostBtn = white with grey border.</li>
+</ul>
+
+<!-- ═══════════════════════════════ SETTINGS CONTEXT ═══════════════════════════════ -->
+<h2>13. State &amp; Settings Context</h2>
+
+<pre><code>// SettingsContext provides:
+interface SettingsContextType {
+  S: Settings;
+  updateS: (fn: (s: Settings) => Settings) => void; // immutable update + auto-save
+  resetToDefaults: () => void;    // restore DEFS
+  purgeAll: () => void;           // wipe to blank state (all zeros)
+  importSettings: (data: Settings) => void; // merge + save
+}
+
+// Initialization order on mount:
+// 1. Try to parse localStorage[STORAGE_KEY]
+// 2. deepMerge(DEFS, parsedData)  — ensures new keys (like 'creche') are backfilled
+// 3. applyDefaults(merged)        — adds missing optional fields
+// 4. migrateClasses(result)       — renames old class names to current ones
+
+// applyDefaults adds:
+// - Missing level fee blocks from DEFS
+// - creche fee in transport zones that don't have it
+// - Renames "Day Student (No Transport)" → "No Transport"
+// - Fills in watermark, background, logoSize defaults if absent
+
+// migrateClasses maps old class names:
+// lp: ['B1','B2','B3','Basic'] → ['Lower Primary']
+// up: ['B4','B5','B6','Basic'] → ['Upper Primary']
+// nursery: ['Nursery 1','Nursery 2'] → ['Nursery']
+// kg: ['K1','K2'] → ['Kindergarten']
+// jhs: ['JHS 1','JHS 2','JHS 3'] → ['JHS']
+
+// deepMerge(target, source):
+// Objects: recurse. Arrays: source wins entirely. Primitives: source wins.</code></pre>
+
+<!-- ═══════════════════════════════ PRINT WINDOW ═══════════════════════════════ -->
+<h2>14. Print Window CSS</h2>
+
+<pre><code>/* Injected into the print popup window: */
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Crimson Pro', 'Times New Roman', serif; background: white; }
+
+.ppage {
+  width: 210mm; min-height: 297mm;
+  display: flex; flex-direction: column;
+  padding: 8mm 12mm;
+  page-break-after: always;
+}
+.pslot { flex: 1; padding: 3mm 0; }
+.pcut {
+  border-top: 1.5px dashed #aaa;
+  margin: 2mm 0; text-align: center;
+}
+.pcut::after {
+  content: "✂  cut here";
+  background: #fff; padding: 0 8px;
+  font-size: 8px; color: #aaa;
+  position: absolute; left: 50%;
+  transform: translateX(-50%) translateY(-50%);
+}
+
+@page { size: A4; margin: 0; }</code></pre>
+
+<!-- ═══════════════════════════════ UI COMPONENTS ═══════════════════════════════ -->
+<h2>15. Reusable UI Patterns</h2>
+
+<h3>Input style (used in Wizard, Generator, Settings)</h3>
+<pre><code>const inp: CSSProperties = {
+  width: '100%', padding: '9px 12px',
+  border: '1.5px solid #E2E8F0',
+  borderRadius: '8px', fontSize: '13.5px',
+  fontFamily: 'inherit', color: '#0F172A',
+  background: '#F8FAFC', outline: 'none',
+  transition: 'border-color .15s', boxSizing: 'border-box'
+};</code></pre>
+
+<h3>Term badge colours (in fee table)</h3>
+<table>
+  <tr><th>terms value</th><th>Label</th><th>Background</th><th>Text colour</th></tr>
+  <tr><td>all</td><td>All Terms</td><td>#DBEAFE</td><td>#1D4ED8</td></tr>
+  <tr><td>1</td><td>Term 1</td><td>#D1FAE5</td><td>#065F46</td></tr>
+  <tr><td>2</td><td>Term 2</td><td>#FEF3C7</td><td>#92400E</td></tr>
+  <tr><td>3</td><td>Term 3</td><td>#EDE9FE</td><td>#5B21B6</td></tr>
+</table>
+
+<h3>Section component (Settings)</h3>
+<pre><code>// White card with dark header
+function Section({ title, icon, children, right }) {
+  return (
+    &lt;div style={{ background:'#fff', border:'1px solid #E8EDF2',
+                  borderRadius:'14px', overflow:'hidden', marginBottom:'20px' }}&gt;
+      &lt;div style={{ padding:'14px 22px', borderBottom:'1px solid #F1F5F9',
+                    display:'flex', alignItems:'center', justifyContent:'space-between',
+                    background:'#FAFBFC' }}&gt;
+        &lt;span&gt;{icon}&lt;/span&gt;
+        &lt;span style={{ fontWeight:700, fontSize:'14px', color:'#0F172A' }}&gt;{title}&lt;/span&gt;
+        {right}
+      &lt;/div&gt;
+      &lt;div style={{ padding:'22px' }}&gt;{children}&lt;/div&gt;
+    &lt;/div&gt;
+  );
+}</code></pre>
+
+<h3>Toggle switch (custom, used for watermark and background on/off)</h3>
+<pre><code>// 36x20px pill toggle
+// Off: background #CBD5E1, knob left 2px
+// On:  background #0EA5E9, knob left 18px
+// Knob: 16x16px white circle with shadow
+// Transition: left .2s, background .2s</code></pre>
+
+<!-- ═══════════════════════════════ IMPORTANT BEHAVIOURS ═══════════════════════════════ -->
+<h2>16. Important Behaviours &amp; Edge Cases</h2>
+
+<ul>
+  <li><strong>Auto-save</strong>: Every call to <code>updateS()</code> triggers <code>localStorage.setItem</code> synchronously. There is no debounce.</li>
+  <li><strong>Term filtering</strong>: Fee items with <code>terms='all'</code> always appear. Items with <code>terms='1'|'2'|'3'</code> only appear in that specific term. Feeding uses a separate per-term lookup.</li>
+  <li><strong>Transport on bill</strong>: If <code>trId === 'none'</code>, no transport fee row is added to the bill and no transport line is shown in the header area. The "No Transport" label never appears on the bill itself.</li>
+  <li><strong>Arrears</strong>: Only shown for levels where <code>hasArrears=true</code> (lp, up, jhs). If the arrears amount is 0, the row still renders but the value cell is blank (showing "_ _ _" dotted lines for handwriting).</li>
+  <li><strong>Logo initials fallback</strong>: If no logo uploaded, shows a navy circle with the initials (first letter of each word in school name, max 2 chars, uppercase).</li>
+  <li><strong>Background SVG pattern</strong>: Uses inline SVG <code>&lt;pattern&gt;</code> with <code>&lt;text&gt;</code> child. Pattern ID must be unique per bill on the same page (use billId prop: <code>bgp-{billId}</code>) to avoid one bill's pattern bleeding into another on the A4 sheet.</li>
+  <li><strong>Watermark z-index</strong>: Both background pattern and watermark sit at <code>zIndex: 0</code>. All bill content sits in a <code>zIndex: 1</code> wrapper so it renders above the overlays.</li>
+  <li><strong>Print font sizes</strong>: Entire bill uses pt units when <code>isPrint=true</code>, px units when <code>isPrint=false</code>. This is critical for correct A4 sizing.</li>
+  <li><strong>Import merge strategy</strong>: Imported JSON is deep-merged on top of DEFS (not directly applied), so any missing keys default to DEFS values. Then <code>applyDefaults</code> and <code>migrateClasses</code> run.</li>
+  <li><strong>Wizard trigger</strong>: On mount, if <code>localStorage</code> has no data → show SetupWizard after 500ms. If data exists but <code>_blank===true</code> → show AdminSetupWizard after 500ms.</li>
+  <li><strong>Fee table key</strong>: The fee items table uses <code>key={activeLv}</code> to force a full remount when switching level tabs, so controlled inputs reset to the new level's values.</li>
+</ul>
+
+<!-- ═══════════════════════════════ FILE STRUCTURE ═══════════════════════════════ -->
+<h2>17. Recommended File Structure</h2>
+
+<pre><code>src/
+├── main.tsx           — ReactDOM.createRoot, import App
+├── App.tsx            — sidebar + header + page routing + wizard triggers
+├── types.ts           — all TypeScript interfaces
+├── defaults.ts        — DEFS, STORAGE_KEY, loadSettings, saveSettings,
+│                        deepMerge, migrateClasses, makeBlankState
+├── SettingsContext.tsx — React context, useState init, updateS, import/export
+├── billCalc.ts        — calcBill() pure function
+├── BillRenderer.tsx   — the bill document (screen + print mode)
+├── GeneratorTab.tsx   — left form + right preview + print button
+├── PrintPreview.tsx   — modal + A4 layout + window.open print
+├── SettingsTab.tsx    — all settings sections
+└── Wizard.tsx         — SetupWizard (6 steps) + AdminSetupWizard (7 steps)</code></pre>
+
+<!-- ═══════════════════════════════ PROMPT ═══════════════════════════════ -->
+<hr class="section-divider">
+<h2>✍️ Ready-to-Paste Prompt for a New AI Tool</h2>
+
+<div class="card" style="background:#F0F9FF; border-color:#BAE6FD;">
+<p>Copy and paste the text below as your initial prompt in another app:</p>
+</div>
+
+<pre style="white-space: pre-wrap; font-size: 12.5px; line-height: 1.75;">
+Build a frontend-only React + TypeScript + Vite web application called "School Bill Generator" with NO backend. All data persists in localStorage under the key "saSchoolBillSettings". No CSS frameworks — use 100% inline React styles.
+
+────────────────────────────────────────
+PURPOSE
+────────────────────────────────────────
+School administrators generate, configure, and print term fee bills for students. Bills are formatted for A4 print, 2 per page with a dashed cut-line between them.
+
+────────────────────────────────────────
+FONTS (Google Fonts link in app root)
+────────────────────────────────────────
+Inter 300/400/500/600/700 — UI chrome
+Playfair Display 600/700 — bill headings
+Crimson Pro 400/600 italic — bill body text
+DM Sans — secondary UI font
+
+────────────────────────────────────────
+COLOUR TOKENS
+────────────────────────────────────────
+Sidebar bg:      #0B1120
+App bg:          #F4F6F9
+Panel bg:        #FFFFFF
+Border:          #E2E8F0
+Accent:          #0EA5E9
+Active nav:      #38BDF8
+Text primary:    #0F172A
+Text body:       #334155
+Text muted:      #64748B / #94A3B8
+Bill navy:       #1B2D5B
+
+Level colours:
+  creche  → #06B6D4
+  nursery → #8B5CF6
+  kg      → #EC4899
+  lp      → #F59E0B
+  up      → #10B981
+  jhs     → #3B82F6
+
+────────────────────────────────────────
+DATA MODEL
+────────────────────────────────────────
+See the TypeScript interfaces:
+
+type LevelKey = 'creche' | 'nursery' | 'kg' | 'lp' | 'up' | 'jhs';
+
+FeeItem { id, label, amount, period, terms: 'all'|'1'|'2'|'3' }
+LevelFees { label, classes: string[], hasArrears, items: FeeItem[], feeding: {'1':n,'2':n,'3':n} }
+TransportZone { id, label, fees: { creche, nursery, kg, lp, up, jhs } }
+SchoolInfo { name, subtitle, address, logo: string|null }
+AcademicInfo { year, term: '1'|'2'|'3', reopening }
+BankInfo { name, branch, account, accountName }
+WatermarkSettings { enabled, mode:'text'|'image', text, image:string|null, opacity, rotation, size }
+BackgroundTextSettings { enabled, text, fontSize, opacity, color, spacing, rotation }
+Settings { school, academic, bank, fees:{creche,nursery,kg,lp,up,jhs}, transport: TransportZone[], logoSize?, watermark?, background?, _blank? }
+
+────────────────────────────────────────
+DEFAULT DATA (St. Anne Catholic School)
+────────────────────────────────────────
+school: { name:"St. Anne Catholic School", subtitle:"Nkontrodo, Elmina", address:"P.O. Box 58, Elmina, Central Region", logo:null }
+academic: { year:"2025-2026", term:"3", reopening:"" }
+bank: { name:"GCB Bank Ltd", branch:"Elmina Branch", account:"1234567890", accountName:"St. Anne Catholic School" }
+
+Fees per level (amounts in GH¢):
+CRÈCHE (hasArrears:false, classes:['Crèche']):
+  Tuition 320/term, Stationary 5/term, Maintenance 15/term, Exams 10/term, Books 180 term1, PTA 30 term2, Sports 15 term2
+  Feeding: T1=490, T2=420, T3=490
+
+NURSERY (hasArrears:false, classes:['Nursery']):
+  Tuition 345/term, Stationary 5/term, Maintenance 20/term, Exams 10/term, Books 220 term1, PTA 30 term2, Sports 15 term2
+  Feeding: T1=490, T2=420, T3=490
+
+KINDERGARTEN (hasArrears:false, classes:['Kindergarten']):
+  Tuition 355/term, Stationary 10/term, Maintenance 20/term, Exams 15/term, Books 450 term1, PTA 30 term2, Sports 15 term2
+  Feeding: T1=490, T2=420, T3=490
+
+LOWER PRIMARY (hasArrears:true, classes:['Lower Primary']):
+  Tuition 365/term, Stationary 10/term, Maintenance 30/term, Exams 15/term, Books 750 term1, PTA 30 term2, Sports 15 term2
+  Feeding: T1=560, T2=480, T3=560
+
+UPPER PRIMARY (hasArrears:true, classes:['Upper Primary']):
+  Tuition 410/term, Stationary 10/term, Maintenance 30/term, Exams 20/term, ICT 10/term, Books 870 term1, PTA 30 term2, Sports 15 term2
+  Feeding: T1=595, T2=540, T3=595
+
+JHS (hasArrears:true, classes:['JHS']):
+  Tuition 500/term, Exams 20/term, Maintenance 40/term, Stationary 10/term, ICT 10/term, Books 1450 term1, PTA 30 term2, Sports 15 term2
+  Feeding: T1=595, T2=540, T3=595
+
+Transport zones:
+  SSNIT          → all levels 350
+  Elmina/Mental  → all levels 420
+  Ankaful/Bronyibima → Cr=580,Nur=580,KG=650,LP=580,UP=580,JHS=580
+  Quarters       → all levels 280
+  Ataabadze      → all levels 650
+  No Transport (id='none') → all 0, never shown on bill
+
+────────────────────────────────────────
+APP LAYOUT
+────────────────────────────────────────
+display:flex, min-height:100vh
+
+SIDEBAR (left, collapsible 230px → 64px):
+- Dark bg #0B1120, shadow 4px right
+- Logo: sky gradient icon box + "School Billing / Assistant" text
+- 3 nav items: ◻ Individual Bill | ▤ Full Term Sheet | ⊙ Settings & Fees
+- Active nav: bg rgba(14,165,233,.18), left border 2px #38BDF8, text #38BDF8
+- Bottom: current term card + "Setup Wizard" button
+- Collapse toggle: small circle button on right edge (‹/›)
+
+MAIN CONTENT (right, flex:1):
+- Top header bar: 58px, white, 1px border-bottom. Page title + subtitle. Right: "All changes auto-saved" green pill.
+- Content: flex:1, overflow:auto. Shows GeneratorTab or SettingsTab.
+
+────────────────────────────────────────
+BILL CALCULATION (calcBill function)
+────────────────────────────────────────
+1. Filter lvFees.items by: terms==='all' OR terms===currentTerm
+2. baseTotal = sum of filtered items
+3. varItems: always add Feeding (lvFees.feeding[term])
+4. If transport trId !== 'none': add Transport (trZone.fees[level], label = zoneName + " Per Term")
+5. varTotal = sum varItems, grandTotal = baseTotal + varTotal
+6. Arrears: include if hasArrears (null otherwise)
+7. classHeaderLabel = 'Class:'
+
+────────────────────────────────────────
+BILL DOCUMENT STRUCTURE (BillRenderer)
+────────────────────────────────────────
+position:relative wrapper. Two absolute overlays (z:0): SVG background pattern and/or watermark. Content wrapper at z:1.
+
+LETTERHEAD (3-col grid):
+  Left: school name (Playfair Display, uppercase, #1B2D5B) + subtitle + address
+  Center: logo img OR initials circle
+  Right: "Payment Details" heading + bank info
+  Separated from body by 2px solid #1B2D5B border-bottom
+
+NAME ROW: "NAME" bold + underline fill line + "Class:" + className value (Crimson Pro)
+
+TRANSPORT LINE: italic, small — "Transport: [zone]" — HIDDEN when trId==='none'
+
+TITLE: centered italic "Child's Bill" (Playfair Display)
+
+FEE TABLE (4 cols: Description | GH¢ | Amount | Period):
+  All fixed fee items → spacer row → TOTAL (bold, #f8f8f6 bg) → Feeding row → Transport row (if any) → TOTAL (grand total) → ARREARS row (if hasArrears)
+  ARREARS: shows value if >0, else blank dotted lines for handwriting
+
+FOOTER: "School Reopens: [date]" centered italic (only if reopening set)
+
+Bill fonts: isPrint=true uses pt units, isPrint=false uses px units.
+BillId prop: unique per bill; used for SVG pattern ID = "bgp-{billId}"
+
+────────────────────────────────────────
+GENERATOR TAB
+────────────────────────────────────────
+Left panel (320px): mode toggle (1 Bill / Full Sheet 2) + form + Print Preview button
+Right panel (flex:1, #F4F6F9): live bill preview card(s)
+
+Form fields: Student Name | Level (select) | Class (select, if >1 class) | Transport Zone | Term | Arrears (if hasArrears)
+
+Print Preview button: full-width #1B2D5B, "🖨 Print Preview"
+
+────────────────────────────────────────
+PRINT PREVIEW MODAL
+────────────────────────────────────────
+Fixed overlay rgba(10,18,40,.85), dark grey container (#444), max-width 740px.
+Shows A4 page (210mm wide). Two bill slots (flex:1 each) separated by dashed "✂ cut here" line.
+"Print / Save as PDF" button → copies innerHTML to window.open() popup → injects Google Fonts + @page{size:A4;margin:0} CSS → window.print() after 500ms.
+ESC key closes modal.
+
+────────────────────────────────────────
+SETTINGS TAB (8 sections)
+────────────────────────────────────────
+1. School Information: name, subtitle, address, logo upload (base64, max 1.5MB)
+2. Academic Year & Term: year text, 3-segment term toggle, reopening date
+3. Bill Appearance: logo size slider (10-200%), watermark (text/image, opacity/rotation/size sliders)
+4. Background Design: on/off, custom text (blank=school name), fontSize/opacity/angle/spacing sliders, colour picker, live SVG preview
+5. Fee Configuration: level pill tabs (colour-coded) + fully editable fee table (label, amount, period, when applied dropdown, delete ×) + "Add fee item" button + feeding rows per term (editable)
+6. Transport Zones: editable grid, all levels, 'none' row hidden
+7. Bank Payment Details: 4 text inputs
+8. Import/Export/Reset: export JSON, import JSON, reset to defaults, wipe all
+
+────────────────────────────────────────
+SETUP WIZARD (6 steps, auto-shows on first load)
+────────────────────────────────────────
+Step 1: Welcome screen (📋 icon, app description, "Skip" / "Get Started →")
+Step 2: School Name, Subtitle, Logo upload
+Step 3: Address, Reopening Date
+Step 4: Bank Name, Branch, Account Name, Account Number
+Step 5: Academic Year, Term toggle
+Step 6: Confirmation summary ("Start Generating Bills →")
+
+ADMIN SETUP WIZARD (7 steps, auto-shows when _blank=true):
+Same as above plus Step 5=Transport Zones table + Step 6=Fee amounts per level
+
+Wizard shell: backdrop-blur overlay, dark header (#0B1120) with step progress dots, scrollable body, PrimaryBtn (sky blue gradient) and GhostBtn (white/grey border).
+
+────────────────────────────────────────
+SETTINGS CONTEXT
+────────────────────────────────────────
+On init: deepMerge(DEFS, localStorageData) → applyDefaults() → migrateClasses()
+updateS(fn): runs fn(prevState), calls saveSettings (localStorage), returns new state
+deepMerge: objects recurse, arrays source-wins, primitives source-wins
+
+────────────────────────────────────────
+IMPORTANT BEHAVIOURS
+────────────────────────────────────────
+- Auto-save on every updateS call (no debounce)
+- Fee table uses key={activeLv} to remount on tab switch (resets controlled inputs)
+- Background SVG pattern ID must be unique per bill: bgp-{billId}
+- Background and watermark sit at z-index 0; bill content at z-index 1
+- "No Transport" never renders a transport line on the bill
+- Arrears row always rendered for hasArrears levels; blank if value=0
+- Logo fallback: initials circle if no logo uploaded
+- Print uses pt font sizes; preview uses px
+</pre>
+
+<hr class="section-divider">
+<p style="text-align:center; color:#94A3B8; font-size:12px;">Generated from the live codebase of <strong>St. Anne — School Bill Generator</strong></p>
+
+</div>
+</body>
+</html>
