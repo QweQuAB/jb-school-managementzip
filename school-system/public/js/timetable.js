@@ -261,7 +261,7 @@ const TT = (function() {
 
   // ── TIMETABLE GENERATOR ──────────────────────────────────────
   function generateTimetable() {
-    const classSel=document.getElementById('ttGenerateClass').value;
+    const classSel=document.getElementById('ttGenerateClass')?.value||'';
     const targetClasses=classSel?[parseInt(classSel)]:state.classes.map(c=>c.id);
     if(targetClasses.length===0){toast('No classes available','error');return;}
     const teachingPeriods=ttState.periods.filter(p=>!p.isBreak);
