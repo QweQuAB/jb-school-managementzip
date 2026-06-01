@@ -531,7 +531,8 @@ async function loadTeachers() {
   tbody.innerHTML = _teachers.map(t => `<tr>
     <td><span class="badge badge-blue">${t.staffId}</span></td>
     <td style="font-weight:500">${t.firstName} ${t.lastName}</td>
-    <td>${t.gender||'-'}</td><td>${t.qualification||'-'}</td><td>${t.phone||'-'}</td><td>${t.email||'-'}</td>
+    <td>${t.gender||'-'}</td><td>${t.qualification||'-'}</td><td>${t.phone||'-'}</td>
+    <td>${t.role?`<span class="badge badge-info" style="font-size:10px">${t.role}</span>`:'-'}</td>
     <td><span class="badge ${t.status==='Active'?'badge-green':'badge-red'}">${t.status}</span></td>
     <td><button class="btn btn-sm btn-outline" onclick="editTeacher(${t.id})"><i class="fa fa-edit"></i></button>
         <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="deleteTeacher(${t.id})"><i class="fa fa-trash"></i></button></td>
@@ -544,7 +545,7 @@ function editTeacher(id) {
   if (!t) return;
   _editId = id;
   document.getElementById('teacher-modal-title').textContent = 'Edit Teacher';
-  ['firstName','lastName','gender','qualification','phone','email','dateJoined','status'].forEach(k => {
+  ['firstName','lastName','gender','qualification','phone','role','dateJoined','status'].forEach(k => {
     const el = document.getElementById(`t-${k}`); if (el) el.value = t[k] || '';
   });
   openModal('teacher-modal', id);
@@ -557,7 +558,7 @@ async function saveTeacher() {
     gender: document.getElementById('t-gender').value,
     qualification: document.getElementById('t-qualification').value,
     phone: document.getElementById('t-phone').value,
-    email: document.getElementById('t-email').value,
+    role: document.getElementById('t-role').value,
     dateJoined: document.getElementById('t-dateJoined').value,
     status: document.getElementById('t-status').value
   };
@@ -577,10 +578,12 @@ async function deleteTeacher(id) {
 
 function populateTeacherDropdowns() {
   const opt = '<option value="">-- Select Teacher --</option>' + _teachers.map(t => `<option value="${t.id}">${t.firstName} ${t.lastName}</option>`).join('');
+  const opt2 = '<option value="">-- None --</option>' + _teachers.map(t => `<option value="${t.id}">${t.firstName} ${t.lastName}</option>`).join('');
   ['c-teacherId','sub-teacherId','lv-teacherId','py-teacherId','msa-teacher'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = opt;
+    const el = document.getElementById(id); if (el) el.innerHTML = opt;
   });
+  const t2 = document.getElementById('c-teacher2Id');
+  if (t2) t2.innerHTML = opt2;
 }
 
 // ─── CLASSES ────────────────────────────────────────────────────────────────
@@ -590,10 +593,14 @@ async function loadClasses() {
   const tbody = document.getElementById('classes-body');
   tbody.innerHTML = _classes.map(c => {
     const t = _teachers.find(x => x.id === c.teacherId);
+    const t2 = _teachers.find(x => x.id === c.teacher2Id);
     const enrolled = students.filter(s => s.classId === c.id).length;
+    const teacherCell = t
+      ? `${t.firstName} ${t.lastName}${t2 ? `<br><span style="font-size:11px;color:var(--text-muted)">+ ${t2.firstName} ${t2.lastName}</span>` : ''}`
+      : '<span class="badge badge-gray">None</span>';
     return `<tr>
       <td style="font-weight:500">${c.name}</td><td>${c.level||'-'}</td>
-      <td>${t?`${t.firstName} ${t.lastName}`:'<span class="badge badge-gray">None</span>'}</td>
+      <td>${teacherCell}</td>
       <td>${enrolled}</td><td>${c.capacity}</td>
       <td><button class="btn btn-sm btn-outline" onclick="editClass(${c.id})"><i class="fa fa-edit"></i></button>
           <button class="btn btn-sm btn-danger" style="margin-left:4px" onclick="deleteClass(${c.id})"><i class="fa fa-trash"></i></button></td>
@@ -606,19 +613,30 @@ function editClass(id) {
   const c = _classes.find(x => x.id === id);
   if (!c) return;
   _editId = id;
+  document.getElementById('class-modal-title').textContent = 'Edit Class';
   document.getElementById('c-name').value = c.name;
   document.getElementById('c-level').value = c.level || '';
   document.getElementById('c-capacity').value = c.capacity;
-  document.getElementById('c-teacherId').innerHTML = '<option value="">-- Assign Teacher --</option>' + _teachers.map(t => `<option value="${t.id}"${t.id===c.teacherId?'selected':''}>${t.firstName} ${t.lastName}</option>`).join('');
+  const tOpt = '<option value="">-- Assign Teacher --</option>' + _teachers.map(t => `<option value="${t.id}"${t.id===c.teacherId?'selected':''}>${t.firstName} ${t.lastName}</option>`).join('');
+  const t2Opt = '<option value="">-- None --</option>' + _teachers.map(t => `<option value="${t.id}"${t.id===c.teacher2Id?'selected':''}>${t.firstName} ${t.lastName}</option>`).join('');
+  document.getElementById('c-teacherId').innerHTML = tOpt;
+  document.getElementById('c-teacher2Id').innerHTML = t2Opt;
   openModal('class-modal', id);
 }
 
 async function saveClass() {
-  const d = { name: document.getElementById('c-name').value.trim(), level: document.getElementById('c-level').value, capacity: parseInt(document.getElementById('c-capacity').value)||40, teacherId: document.getElementById('c-teacherId').value||null };
+  const d = {
+    name: document.getElementById('c-name').value.trim(),
+    level: document.getElementById('c-level').value,
+    capacity: parseInt(document.getElementById('c-capacity').value)||40,
+    teacherId: document.getElementById('c-teacherId').value||null,
+    teacher2Id: document.getElementById('c-teacher2Id').value||null
+  };
   if (!d.name) { toast('Class name required', 'danger'); return; }
   if (_editId) { await API.put(`/api/classes/${_editId}`, d); toast('Class updated'); }
   else { await API.post('/api/classes', d); toast('Class created'); }
   closeModal('class-modal');
+  document.getElementById('class-modal-title').textContent = 'Add Class';
   loadClasses();
 }
 

@@ -264,74 +264,105 @@ const TT = (function() {
     const classSel=document.getElementById('ttGenerateClass').value;
     const targetClasses=classSel?[parseInt(classSel)]:state.classes.map(c=>c.id);
     if(targetClasses.length===0){toast('No classes available','error');return;}
-    if(ttState.periods.filter(p=>!p.isBreak).length===0){toast('Please set up school periods first','error');return;}
-    const slots=[];
-    const teacherDayPeriodUsed={}; // track usage
+    const teachingPeriods=ttState.periods.filter(p=>!p.isBreak);
+    if(teachingPeriods.length===0){toast('Please set up school periods first','error');return;}
 
+    // Build the global pool of ALL needed placements across all classes.
+    // Processing globally (not class-by-class) prevents early classes from
+    // monopolising a teacher's available slots.
+    const globalPool=[];
     targetClasses.forEach(classId=>{
       const classAssignments=ttState.assignments.filter(a=>a.classId===classId);
-      const teachingPeriods=ttState.periods.filter(p=>!p.isBreak);
-      const totalPeriods=teachingPeriods.length*DAYS.length;
-
-      // Add break/assembly slots
-      ttState.periods.filter(p=>p.isBreak).forEach(p=>{
-        DAYS.forEach(day=>{
-          slots.push({classId,day,periodId:p.id,subjectId:null,teacherId:null,label:p.name});
-        });
-      });
-
-      // Build a pool of (day,period,assignment) needed slots
-      const needed=[];
       classAssignments.forEach(a=>{
         const meta=ttState.meta[a.teacherId]||{availableDays:DAYS,maxPeriodsPerDay:6};
         const availDays=DAYS.filter(d=>(meta.availableDays||DAYS).includes(d));
-        for(let i=0;i<a.periodsPerWeek;i++) needed.push({assignment:a,availDays});
+        const teacherCapacity=availDays.length*(meta.maxPeriodsPerDay||6);
+        for(let i=0;i<a.periodsPerWeek;i++){
+          globalPool.push({classId,assignment:a,availDays,teacherCapacity,meta});
+        }
+      });
+    });
+
+    // Try multiple independent attempts and keep the one with the fewest conflicts.
+    const ATTEMPTS=6;
+    let bestSlots=null,bestConflicts=Infinity;
+
+    for(let attempt=0;attempt<ATTEMPTS;attempt++){
+      // Shuffle then stable-sort hardest-to-place first
+      // (teachers with least total available slots come first)
+      const pool=[...globalPool].sort(()=>Math.random()-0.5);
+      pool.sort((a,b)=>a.teacherCapacity-b.teacherCapacity);
+
+      const slots=[];
+      const classUsed={};   // `${classId}_${day}_${periodId}` -> true
+      const teacherUsed={}; // `${teacherId}_${day}_${periodId}` -> true
+      const teacherDayCnt={}; // `${teacherId}_${day}` -> count
+      let conflicts=0;
+
+      // Pre-fill break slots for every target class
+      targetClasses.forEach(classId=>{
+        ttState.periods.filter(p=>p.isBreak).forEach(p=>{
+          DAYS.forEach(day=>{
+            slots.push({classId,day,periodId:p.id,subjectId:null,teacherId:null,label:p.name});
+          });
+        });
       });
 
-      // Shuffle for better distribution
-      for(let i=needed.length-1;i>0;i--){
-        const j=Math.floor(Math.random()*(i+1));
-        [needed[i],needed[j]]=[needed[j],needed[i]];
-      }
-
-      // Track assigned slots per class
-      const classSlots={}; // day+periodId -> true
-      DAYS.forEach(day=>teachingPeriods.forEach(p=>{classSlots[`${day}_${p.id}`]=false;}));
-
-      needed.forEach(({assignment,availDays})=>{
+      pool.forEach(({classId,assignment,availDays,meta})=>{
         const {teacherId}=assignment;
-        if(!teacherDayPeriodUsed[teacherId]) teacherDayPeriodUsed[teacherId]={};
-        const meta=ttState.meta[teacherId]||{maxPeriodsPerDay:6};
-
+        const maxPd=meta.maxPeriodsPerDay||6;
         let placed=false;
-        const dayOrder=[...availDays].sort(()=>Math.random()-0.5);
-        for(const day of dayOrder){
-          if(placed) break;
-          const dayCount=Object.entries(teacherDayPeriodUsed[teacherId]).filter(([k,v])=>k.startsWith(day+'_')&&v).length;
-          if(dayCount>=(meta.maxPeriodsPerDay||6)) continue;
 
+        // Phase 1 – try within the teacher's available days without conflict
+        const dayOrder=[...availDays].sort(()=>Math.random()-0.5);
+        outer:
+        for(const day of dayOrder){
+          const dcKey=`${teacherId}_${day}`;
+          if((teacherDayCnt[dcKey]||0)>=maxPd) continue;
           const periodOrder=[...teachingPeriods].sort(()=>Math.random()-0.5);
-          for(const period of periodOrder){
-            const slotKey=`${day}_${period.id}`;
-            const tKey=`${day}_${period.id}`;
-            if(!classSlots[slotKey]&&!teacherDayPeriodUsed[teacherId][tKey]){
-              classSlots[slotKey]=true;
-              teacherDayPeriodUsed[teacherId][tKey]=true;
-              slots.push({classId,day,periodId:period.id,subjectId:assignment.subjectId,teacherId,label:''});
-              placed=true;
-              break;
+          for(const p of periodOrder){
+            const ck=`${classId}_${day}_${p.id}`;
+            const tk=`${teacherId}_${day}_${p.id}`;
+            if(!classUsed[ck]&&!teacherUsed[tk]){
+              classUsed[ck]=true; teacherUsed[tk]=true;
+              teacherDayCnt[dcKey]=(teacherDayCnt[dcKey]||0)+1;
+              slots.push({classId,day,periodId:p.id,subjectId:assignment.subjectId,teacherId,label:''});
+              placed=true; break outer;
             }
           }
         }
+
+        // Phase 2 – expand to all days (teacher unavailable but class slot free)
         if(!placed){
-          // Place in first free slot ignoring teacher conflicts (mark as conflict)
+          outer2:
+          for(const day of DAYS){
+            const dcKey=`${teacherId}_${day}`;
+            if((teacherDayCnt[dcKey]||0)>=maxPd) continue;
+            for(const p of teachingPeriods){
+              const ck=`${classId}_${day}_${p.id}`;
+              const tk=`${teacherId}_${day}_${p.id}`;
+              if(!classUsed[ck]){
+                classUsed[ck]=true;
+                const hasTeacherConflict=!!teacherUsed[tk];
+                if(!hasTeacherConflict) teacherUsed[tk]=true;
+                else conflicts++;
+                teacherDayCnt[dcKey]=(teacherDayCnt[dcKey]||0)+1;
+                slots.push({classId,day,periodId:p.id,subjectId:assignment.subjectId,teacherId,label:hasTeacherConflict?'⚠':''});
+                placed=true; break outer2;
+              }
+            }
+          }
+        }
+
+        // Phase 3 – last resort: find any free class slot, ignore all teacher constraints
+        if(!placed){
           for(const day of DAYS){
             if(placed) break;
-            for(const period of teachingPeriods){
-              const slotKey=`${day}_${period.id}`;
-              if(!classSlots[slotKey]){
-                classSlots[slotKey]=true;
-                slots.push({classId,day,periodId:period.id,subjectId:assignment.subjectId,teacherId,label:'⚠'});
+            for(const p of teachingPeriods){
+              const ck=`${classId}_${day}_${p.id}`;
+              if(!classUsed[ck]){
+                classUsed[ck]=true; conflicts++;
+                slots.push({classId,day,periodId:p.id,subjectId:assignment.subjectId,teacherId,label:'⚠'});
                 placed=true; break;
               }
             }
@@ -339,19 +370,33 @@ const TT = (function() {
         }
       });
 
-      // Fill empty teaching slots with FREE label
-      DAYS.forEach(day=>{
-        teachingPeriods.forEach(p=>{
-          const slotKey=`${day}_${p.id}`;
-          if(!classSlots[slotKey]){
-            slots.push({classId,day,periodId:p.id,subjectId:null,teacherId:null,label:'Free'});
-          }
+      // Fill remaining class teaching slots with Free
+      targetClasses.forEach(classId=>{
+        DAYS.forEach(day=>{
+          teachingPeriods.forEach(p=>{
+            const ck=`${classId}_${day}_${p.id}`;
+            if(!classUsed[ck]){
+              slots.push({classId,day,periodId:p.id,subjectId:null,teacherId:null,label:'Free'});
+            }
+          });
         });
       });
-    });
 
-    ttState.slots=slots;
-    return slots;
+      if(conflicts<bestConflicts){
+        bestConflicts=conflicts;
+        bestSlots=slots;
+        if(conflicts===0) break; // perfect – stop early
+      }
+    }
+
+    if(bestConflicts>0){
+      toast(`Timetable generated with ${bestConflicts} conflict(s). Adjust teacher availability or periods per week to reduce them.`,'warning');
+    } else {
+      toast('Timetable generated – no conflicts!','success');
+    }
+
+    ttState.slots=bestSlots;
+    return bestSlots;
   }
 
   async function generateAndSave() {

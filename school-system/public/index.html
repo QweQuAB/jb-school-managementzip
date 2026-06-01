@@ -398,7 +398,7 @@ tr:hover td{background:#f8fafc}
         <button class="btn btn-primary" onclick="openModal('teacher-modal','')"><i class="fa fa-plus"></i> Add Teacher</button>
       </div>
       <div class="card"><div class="table-wrap"><table>
-        <thead><tr><th>Staff ID</th><th>Name</th><th>Gender</th><th>Qualification</th><th>Phone</th><th>Email</th><th>Status</th><th></th></tr></thead>
+        <thead><tr><th>Staff ID</th><th>Name</th><th>Gender</th><th>Qualification</th><th>Phone</th><th>Role</th><th>Status</th><th></th></tr></thead>
         <tbody id="teachers-body"></tbody>
       </table></div></div>
     </div>
@@ -875,7 +875,20 @@ tr:hover td{background:#f8fafc}
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Phone</label><input class="form-control" id="t-phone"></div>
-        <div class="form-group"><label class="form-label">Email</label><input class="form-control" id="t-email"></div>
+        <div class="form-group"><label class="form-label">Role in School</label>
+          <select class="form-control" id="t-role">
+            <option value="">-- Select Role --</option>
+            <option>Class Teacher</option>
+            <option>Subject Teacher</option>
+            <option>Head Teacher</option>
+            <option>Assistant Head Teacher</option>
+            <option>Deputy Head Teacher</option>
+            <option>Guidance Counsellor</option>
+            <option>Sports Master</option>
+            <option>ICT Coordinator</option>
+            <option>Other</option>
+          </select>
+        </div>
       </div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Date Joined</label><input class="form-control" type="date" id="t-dateJoined"></div>
@@ -892,16 +905,33 @@ tr:hover td{background:#f8fafc}
 <!-- Class Modal -->
 <div class="modal-overlay" id="class-modal">
   <div class="modal">
-    <div class="modal-header"><h3>Add Class</h3><button class="modal-close" onclick="closeModal('class-modal')"><i class="fa fa-times"></i></button></div>
+    <div class="modal-header"><h3 id="class-modal-title">Add Class</h3><button class="modal-close" onclick="closeModal('class-modal')"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
-      <div class="form-group"><label class="form-label">Class Name *</label><input class="form-control" id="c-name"></div>
+      <div class="form-group"><label class="form-label">Class Name *</label><input class="form-control" id="c-name" placeholder="e.g. Basic 1A"></div>
       <div class="form-row">
         <div class="form-group"><label class="form-label">Level</label>
-          <select class="form-control" id="c-level"><option value="">--</option><option>KG 1</option><option>KG 2</option><option>Primary 1</option><option>Primary 2</option><option>Primary 3</option><option>Primary 4</option><option>Primary 5</option><option>Primary 6</option><option>JHS 1</option><option>JHS 2</option><option>JHS 3</option></select>
+          <select class="form-control" id="c-level">
+            <option value="">--</option>
+            <option>Crèche</option>
+            <option>Nursery 1</option>
+            <option>Nursery 2</option>
+            <option>KG 1</option>
+            <option>KG 2</option>
+            <option>Primary 1</option>
+            <option>Primary 2</option>
+            <option>Primary 3</option>
+            <option>Primary 4</option>
+            <option>Primary 5</option>
+            <option>Primary 6</option>
+            <option>JHS 1</option>
+            <option>JHS 2</option>
+            <option>JHS 3</option>
+          </select>
         </div>
         <div class="form-group"><label class="form-label">Capacity</label><input class="form-control" type="number" id="c-capacity" value="40"></div>
       </div>
       <div class="form-group"><label class="form-label">Class Teacher</label><select class="form-control" id="c-teacherId"><option value="">-- Assign Teacher --</option></select></div>
+      <div class="form-group"><label class="form-label">Second Teacher <span style="color:var(--text-muted);font-weight:400">(optional)</span></label><select class="form-control" id="c-teacher2Id"><option value="">-- None --</option></select></div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('class-modal')">Cancel</button>

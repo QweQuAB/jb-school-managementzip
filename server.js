@@ -32,13 +32,13 @@ CREATE TABLE IF NOT EXISTS students (
 CREATE TABLE IF NOT EXISTS teachers (
   id INTEGER PRIMARY KEY AUTOINCREMENT, staffId TEXT, firstName TEXT NOT NULL,
   lastName TEXT NOT NULL, gender TEXT DEFAULT '', qualification TEXT DEFAULT '',
-  phone TEXT DEFAULT '', email TEXT DEFAULT '', subjectId INTEGER,
+  phone TEXT DEFAULT '', role TEXT DEFAULT '', subjectId INTEGER,
   status TEXT DEFAULT 'Active', dateJoined TEXT DEFAULT '', specialization TEXT DEFAULT '',
   createdAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS classes (
   id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, level TEXT DEFAULT '',
-  teacherId INTEGER, capacity INTEGER DEFAULT 40
+  teacherId INTEGER, teacher2Id INTEGER, capacity INTEGER DEFAULT 40
 );
 CREATE TABLE IF NOT EXISTS subjects (
   id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT DEFAULT '', name TEXT NOT NULL,
@@ -168,6 +168,15 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 `);
 
+// ─── Migrations (safe alter table for existing DBs) ──────────────────────────
+[
+  ['teachers','role','TEXT DEFAULT \'\''],
+  ['classes','teacher2Id','INTEGER']
+].forEach(([tbl,col,def])=>{
+  const cols=db.prepare(`PRAGMA table_info(${tbl})`).all().map(r=>r.name);
+  if(!cols.includes(col)) db.exec(`ALTER TABLE ${tbl} ADD COLUMN ${col} ${def}`);
+});
+
 // ─── Seed defaults ────────────────────────────────────────────────────────────
 const ins = db.prepare(`INSERT OR IGNORE INTO settings(key,value) VALUES(?,?)`);
 [
@@ -279,16 +288,16 @@ app.get('/api/teachers',(req,res)=>res.json(db.prepare('SELECT * FROM teachers O
 app.post('/api/teachers',(req,res)=>{
   const d=req.body, year=getSetting('academicYear')||'2025', id=nextId('teacher');
   const staffId=`TCH/${year}/${String(id).padStart(3,'0')}`;
-  db.prepare(`INSERT INTO teachers(id,staffId,firstName,lastName,gender,qualification,phone,email,subjectId,status,dateJoined,specialization)VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(id,staffId,d.firstName,d.lastName,d.gender||'',d.qualification||'',d.phone||'',d.email||'',d.subjectId||null,d.status||'Active',d.dateJoined||'',d.specialization||'');
+  db.prepare(`INSERT INTO teachers(id,staffId,firstName,lastName,gender,qualification,phone,role,subjectId,status,dateJoined,specialization)VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(id,staffId,d.firstName,d.lastName,d.gender||'',d.qualification||'',d.phone||'',d.role||'',d.subjectId||null,d.status||'Active',d.dateJoined||'',d.specialization||'');
   logActivity(`Teacher added: ${d.firstName} ${d.lastName}`,'blue');
   auditLog('Added teacher','Teachers','',`${d.firstName} ${d.lastName}`);
   res.json({id,staffId});
 });
 app.put('/api/teachers/:id',(req,res)=>{
   const d=req.body;
-  db.prepare(`UPDATE teachers SET firstName=?,lastName=?,gender=?,qualification=?,phone=?,email=?,subjectId=?,status=?,dateJoined=?,specialization=? WHERE id=?`)
-    .run(d.firstName,d.lastName,d.gender||'',d.qualification||'',d.phone||'',d.email||'',d.subjectId||null,d.status||'Active',d.dateJoined||'',d.specialization||'',req.params.id);
+  db.prepare(`UPDATE teachers SET firstName=?,lastName=?,gender=?,qualification=?,phone=?,role=?,subjectId=?,status=?,dateJoined=?,specialization=? WHERE id=?`)
+    .run(d.firstName,d.lastName,d.gender||'',d.qualification||'',d.phone||'',d.role||'',d.subjectId||null,d.status||'Active',d.dateJoined||'',d.specialization||'',req.params.id);
   res.json({success:true});
 });
 app.delete('/api/teachers/:id',(req,res)=>{
@@ -300,13 +309,13 @@ app.delete('/api/teachers/:id',(req,res)=>{
 app.get('/api/classes',(req,res)=>res.json(db.prepare('SELECT * FROM classes ORDER BY id').all()));
 app.post('/api/classes',(req,res)=>{
   const d=req.body;
-  const r=db.prepare(`INSERT INTO classes(name,level,teacherId,capacity)VALUES(?,?,?,?)`).run(d.name,d.level||'',d.teacherId||null,d.capacity||40);
+  const r=db.prepare(`INSERT INTO classes(name,level,teacherId,teacher2Id,capacity)VALUES(?,?,?,?,?)`).run(d.name,d.level||'',d.teacherId||null,d.teacher2Id||null,d.capacity||40);
   logActivity(`Class created: ${d.name}`,'purple');
   res.json({id:r.lastInsertRowid});
 });
 app.put('/api/classes/:id',(req,res)=>{
   const d=req.body;
-  db.prepare(`UPDATE classes SET name=?,level=?,teacherId=?,capacity=? WHERE id=?`).run(d.name,d.level||'',d.teacherId||null,d.capacity||40,req.params.id);
+  db.prepare(`UPDATE classes SET name=?,level=?,teacherId=?,teacher2Id=?,capacity=? WHERE id=?`).run(d.name,d.level||'',d.teacherId||null,d.teacher2Id||null,d.capacity||40,req.params.id);
   res.json({success:true});
 });
 app.delete('/api/classes/:id',(req,res)=>{
