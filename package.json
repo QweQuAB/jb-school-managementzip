@@ -1,16 +1,57 @@
 {
-  "name": "workspace",
+  "name": "jb-school-management",
   "version": "1.0.0",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
+  "main": "main.js",
+  "description": "A professional school management system for Ghanaian schools",
+  "author": "JBit",
   "license": "ISC",
-  "description": "",
+  "keywords": [],
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
   "dependencies": {
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.10.0",
     "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "electron": "31.0.0",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.jbit.schoolmanagement",
+    "productName": "School Management System",
+    "copyright": "Copyright   2026 JBit",
+    "icon": "jbsms.ico",
+    "files": [
+      "main.js",
+      "server.js",
+      "school-system/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "jbsms.ico",
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "School Management System",
+      "installerIcon": "jbsms.ico",
+      "uninstallerIcon": "jbsms.ico",
+      "installerHeaderIcon": "jbsms.ico"
+    }
+  },
+  "allowScripts": {
+    "better-sqlite3@12.10.0": true,
+    "electron@31.0.0": true,
+    "electron-winstaller@5.4.0": true
   }
 }
