@@ -39,4 +39,4 @@ jobs:
     - run: npm ci
     - run: npm run build --if-present
       env:
-       GH_TOKEN: ${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}
+       GH_TOKEN: ${{ secrets.GH_TOKEN }}
