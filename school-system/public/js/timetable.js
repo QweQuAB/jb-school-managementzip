@@ -78,13 +78,16 @@ const TT = (function () {
         subjectId: parseInt(a.subjectId),
         periodsPerWeek: parseInt(a.periodsPerWeek) || 1
       }));
-      tt.slots = (slots || []).map(s => ({
-        ...s,
-        classId: parseInt(s.classId),
-        periodId: parseInt(s.periodId),
-        subjectId: s.subjectId ? parseInt(s.subjectId) : null,
-        teacherId: s.teacherId ? parseInt(s.teacherId) : null
-      }));
+      tt.slots = (slots || [])
+        .map(s => ({
+          ...s,
+          classId: parseInt(s.classId),
+          periodId: parseInt(s.periodId),
+          subjectId: s.subjectId ? parseInt(s.subjectId) : null,
+          teacherId: s.teacherId ? parseInt(s.teacherId) : null
+        }))
+        // Drop any slots with invalid periodId (from old buggy saves before fix)
+        .filter(s => !isNaN(s.periodId));
     } catch (e) { console.error('Timetable load error', e); }
   }
 
@@ -496,8 +499,22 @@ const TT = (function () {
     return bestSlots;
   }
 
+  // Ensures all periods have real DB ids before the generator runs.
+  // Without real ids, periodId is undefined → saved as NULL → loaded as NaN → nothing renders.
+  async function ensurePeriodsHaveIds() {
+    if (tt.periods.length === 0 || tt.periods.some(p => !p.id)) {
+      await API.post('/api/timetable/periods', tt.periods);
+      const saved = await API.get('/api/timetable/periods');
+      tt.periods = saved.map(p => ({
+        ...p, id: parseInt(p.id), isBreak: !!p.isBreak, sortOrder: parseInt(p.sortOrder) || 0
+      }));
+    }
+  }
+
   async function generateAndSave() {
     toast('Generating timetable…', 'info');
+    // Persist periods first so every slot gets a real integer periodId
+    await ensurePeriodsHaveIds();
     const slots = generateTimetable();
     if (!slots) return;
     await API.post('/api/timetable/slots', slots);
@@ -532,14 +549,28 @@ const TT = (function () {
   function renderTimetableView() {
     const container = document.getElementById('ttViewContainer');
     if (!container) return;
+
+    const mode = document.getElementById('ttViewMode')?.value || 'class';
+    const filterSel = document.getElementById('ttViewFilter');
+    // Save current selection BEFORE repopulating (innerHTML reset wipes the value)
+    const savedFilter = filterSel?.value || '';
+
     if (tt.slots.length === 0) {
       populateViewFilters();
       container.innerHTML = `<div class="alert alert-info"><i class="fas fa-info-circle"></i> No timetable generated yet. Go to <strong>Teacher Setup</strong>, configure teachers, then click <strong>Generate Timetable Now</strong>.</div>`;
       return;
     }
+
     populateViewFilters();
-    const mode = document.getElementById('ttViewMode')?.value || 'class';
-    const filterVal = document.getElementById('ttViewFilter')?.value;
+
+    // Restore the user's filter selection after the dropdown was repopulated
+    if (savedFilter && filterSel) {
+      filterSel.value = savedFilter;
+      // Only keep restored value if it's a valid option
+      if (!filterSel.value) filterSel.value = filterSel.options[0]?.value || '';
+    }
+
+    const filterVal = filterSel?.value || '';
     if (mode === 'class') {
       renderClassView(filterVal ? parseInt(filterVal) : _classes[0]?.id, container);
     } else {
