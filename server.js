@@ -753,21 +753,46 @@ app.get('/api/stats',(req,res)=>{
 
 // ─── Export ───────────────────────────────────────────────────────────────────
 app.get('/api/export',(req,res)=>{
+  const q=t=>{ try{ return db.prepare('SELECT * FROM '+t).all(); }catch(e){ return []; } };
   const data={
-    students:db.prepare('SELECT * FROM students').all(),
-    teachers:db.prepare('SELECT * FROM teachers').all(),
-    classes:db.prepare('SELECT * FROM classes').all(),
-    subjects:db.prepare('SELECT * FROM subjects').all(),
-    assessments:db.prepare('SELECT * FROM assessments').all(),
-    fees:db.prepare('SELECT * FROM fees').all(),
-    attendance:db.prepare('SELECT * FROM attendance').all(),
-    expenses:db.prepare('SELECT * FROM expenses').all(),
-    inventory:db.prepare('SELECT * FROM inventory').all(),
-    scholarships:db.prepare('SELECT * FROM scholarships').all(),
-    settings:db.prepare('SELECT * FROM settings').all(),
-    exportedAt:new Date().toISOString()
+    // ── Core academic records ─────────────────────────────────────────────────
+    settings:           q('settings'),
+    students:           q('students'),
+    teachers:           q('teachers'),
+    classes:            q('classes'),
+    subjects:           q('subjects'),
+    assessments:        q('assessments'),
+    fees:               q('fees'),
+    attendance:         q('attendance'),
+    // ── Staff & HR ────────────────────────────────────────────────────────────
+    staff_attendance:   q('staff_attendance'),
+    leave_requests:     q('leave_requests'),
+    payroll:            q('payroll'),
+    // ── Finance ───────────────────────────────────────────────────────────────
+    expenses:           q('expenses'),
+    petty_cash:         q('petty_cash'),
+    // ── Student records ───────────────────────────────────────────────────────
+    promotions:         q('promotions'),
+    conduct_log:        q('conduct_log'),
+    scholarships:       q('scholarships'),
+    inventory:          q('inventory'),
+    // ── Academic config ───────────────────────────────────────────────────────
+    grading_rules:      q('grading_rules'),
+    assignments:        q('assignments'),
+    announcements:      q('announcements'),
+    calendar_events:    q('calendar_events'),
+    notifications:      q('notifications'),
+    activity:           q('activity'),
+    // ── Timetable (full config + generated slots) ─────────────────────────────
+    timetable_periods:      q('timetable_periods'),
+    timetable_teacher_meta: q('timetable_teacher_meta'),
+    timetable_assignments:  q('timetable_assignments'),
+    timetable_slots:        q('timetable_slots'),
+    exportedAt: new Date().toISOString(),
+    exportVersion: 2
   };
-  res.setHeader('Content-Disposition',`attachment; filename=school_export_${new Date().toISOString().split('T')[0]}.json`);
+  const date=new Date().toISOString().split('T')[0];
+  res.setHeader('Content-Disposition',`attachment; filename=school_full_export_${date}.json`);
   res.json(data);
 });
 
@@ -826,7 +851,93 @@ app.post('/api/import',(req,res)=>{
     db.prepare(`INSERT OR IGNORE INTO scholarships(id,studentId,type,sponsor,startDate,endDate,status,benefits,notes)
       VALUES(?,?,?,?,?,?,?,?,?)`).run(r.id,r.studentId,r.type||'',r.sponsor||'',r.startDate||'',r.endDate||'',r.status||'Active',r.benefits||'',r.notes||'');
   });
-  // Merge settings (non-destructive: only set keys not already present)
+
+  // ── Staff & HR ──────────────────────────────────────────────────────────────
+  tryImport('staff_attendance',data.staff_attendance,r=>{
+    db.prepare(`INSERT OR IGNORE INTO staff_attendance(id,teacherId,date,status)
+      VALUES(?,?,?,?)`).run(r.id,r.teacherId,r.date||'',r.status||'Present');
+  });
+  tryImport('leave_requests',data.leave_requests,r=>{
+    db.prepare(`INSERT OR IGNORE INTO leave_requests(id,teacherId,type,startDate,endDate,reason,status,approvedBy)
+      VALUES(?,?,?,?,?,?,?,?)`).run(r.id,r.teacherId,r.type||'',r.startDate||'',r.endDate||'',r.reason||'',r.status||'Pending',r.approvedBy||'');
+  });
+  tryImport('payroll',data.payroll,r=>{
+    db.prepare(`INSERT OR IGNORE INTO payroll(id,teacherId,month,year,basicSalary,allowances,deductions,netPay,status)
+      VALUES(?,?,?,?,?,?,?,?,?)`).run(r.id,r.teacherId,r.month||'',r.year||'',r.basicSalary||0,r.allowances||0,r.deductions||0,r.netPay||0,r.status||'Pending');
+  });
+
+  // ── Finance ─────────────────────────────────────────────────────────────────
+  tryImport('petty_cash',data.petty_cash,r=>{
+    db.prepare(`INSERT OR IGNORE INTO petty_cash(id,amount,purpose,date,authorizedBy,type,balance)
+      VALUES(?,?,?,?,?,?,?)`).run(r.id,r.amount||0,r.purpose||'',r.date||'',r.authorizedBy||'',r.type||'Debit',r.balance||0);
+  });
+
+  // ── Student records ─────────────────────────────────────────────────────────
+  tryImport('promotions',data.promotions,r=>{
+    db.prepare(`INSERT OR IGNORE INTO promotions(id,studentId,fromClassId,toClassId,action,reason,term,year,date)
+      VALUES(?,?,?,?,?,?,?,?,?)`).run(r.id,r.studentId,r.fromClassId||null,r.toClassId||null,r.action||'',r.reason||'',r.term||'',r.year||'',r.date||'');
+  });
+  tryImport('conduct_log',data.conduct_log,r=>{
+    db.prepare(`INSERT OR IGNORE INTO conduct_log(id,studentId,classId,date,incident,action,handledBy)
+      VALUES(?,?,?,?,?,?,?)`).run(r.id,r.studentId,r.classId||null,r.date||'',r.incident||'',r.action||'',r.handledBy||'');
+  });
+
+  // ── Academic config ─────────────────────────────────────────────────────────
+  tryImport('grading_rules',data.grading_rules,r=>{
+    db.prepare(`INSERT OR IGNORE INTO grading_rules(id,minScore,maxScore,grade,remarks)
+      VALUES(?,?,?,?,?)`).run(r.id,r.minScore||0,r.maxScore||100,r.grade||'',r.remarks||'');
+  });
+  tryImport('assignments',data.assignments,r=>{
+    db.prepare(`INSERT OR IGNORE INTO assignments(id,title,subjectId,classId,dateAssigned,dueDate,description,status)
+      VALUES(?,?,?,?,?,?,?,?)`).run(r.id,r.title||'',r.subjectId||null,r.classId||null,r.dateAssigned||'',r.dueDate||'',r.description||'',r.status||'Active');
+  });
+  tryImport('announcements',data.announcements,r=>{
+    db.prepare(`INSERT OR IGNORE INTO announcements(id,title,body,targetClassId,author,datePosted,type)
+      VALUES(?,?,?,?,?,?,?)`).run(r.id,r.title||'',r.body||'',r.targetClassId||null,r.author||'',r.datePosted||'',r.type||'General');
+  });
+  tryImport('calendar_events',data.calendar_events,r=>{
+    db.prepare(`INSERT OR IGNORE INTO calendar_events(id,title,startDate,endDate,type,description,term,year,color,createdAt)
+      VALUES(?,?,?,?,?,?,?,?,?,?)`).run(r.id,r.title||'',r.startDate||'',r.endDate||'',r.type||'Other',r.description||'',r.term||'',r.year||'',r.color||'#4f46e5',r.createdAt||'');
+  });
+  tryImport('notifications',data.notifications,r=>{
+    db.prepare(`INSERT OR IGNORE INTO notifications(id,title,message,type,module,link,dismissed,createdAt)
+      VALUES(?,?,?,?,?,?,?,?)`).run(r.id,r.title||'',r.message||'',r.type||'info',r.module||'',r.link||'',r.dismissed||0,r.createdAt||'');
+  });
+  tryImport('activity',data.activity,r=>{
+    db.prepare(`INSERT OR IGNORE INTO activity(id,text,type,time)
+      VALUES(?,?,?,?)`).run(r.id,r.text||'',r.type||'info',r.time||new Date().toISOString());
+  });
+
+  // ── Timetable ───────────────────────────────────────────────────────────────
+  tryImport('timetable_periods',data.timetable_periods,r=>{
+    db.prepare(`INSERT OR IGNORE INTO timetable_periods(id,name,startTime,endTime,isBreak,sortOrder)
+      VALUES(?,?,?,?,?,?)`).run(r.id,r.name||'',r.startTime||'',r.endTime||'',r.isBreak?1:0,r.sortOrder||0);
+  });
+  // timetable_teacher_meta uses teacherId as PK, not id
+  if(Array.isArray(data.timetable_teacher_meta)&&data.timetable_teacher_meta.length){
+    let n=0;
+    const t=db.transaction(()=>{
+      data.timetable_teacher_meta.forEach(r=>{
+        try{
+          db.prepare(`INSERT OR IGNORE INTO timetable_teacher_meta(teacherId,teacherType,availableDays,maxPeriodsPerDay,isClassTeacher,classTeacherId)
+            VALUES(?,?,?,?,?,?)`).run(r.teacherId,r.teacherType||'Full-time',r.availableDays||'Mon,Tue,Wed,Thu,Fri',r.maxPeriodsPerDay||6,r.isClassTeacher?1:0,r.classTeacherId||null);
+          n++;
+        }catch(e){errors.push('timetable_teacher_meta#'+r.teacherId+': '+e.message);}
+      });
+    });
+    try{t();}catch(e){errors.push('timetable_teacher_meta batch: '+e.message);}
+    results.timetable_teacher_meta=n;
+  }
+  tryImport('timetable_assignments',data.timetable_assignments,r=>{
+    db.prepare(`INSERT OR IGNORE INTO timetable_assignments(id,teacherId,classId,subjectId,periodsPerWeek,contactHours)
+      VALUES(?,?,?,?,?,?)`).run(r.id,r.teacherId,r.classId,r.subjectId,r.periodsPerWeek||1,r.contactHours||0);
+  });
+  tryImport('timetable_slots',data.timetable_slots,r=>{
+    db.prepare(`INSERT OR IGNORE INTO timetable_slots(id,classId,day,periodId,subjectId,teacherId,label)
+      VALUES(?,?,?,?,?,?,?)`).run(r.id,r.classId,r.day||'',r.periodId,r.subjectId||null,r.teacherId||null,r.label||'');
+  });
+
+  // ── Settings (non-destructive: only set keys not already present) ───────────
   if(data.settings&&Array.isArray(data.settings)){
     let settingsImported=0;
     data.settings.forEach(s=>{
@@ -835,7 +946,7 @@ app.post('/api/import',(req,res)=>{
     results.settings=settingsImported;
   }
 
-  // Rebuild counters from max IDs
+  // Rebuild counters from max IDs so auto-increment continues from right place
   try{
     const maxStu=db.prepare('SELECT MAX(id) as m FROM students').get().m||0;
     const maxTch=db.prepare('SELECT MAX(id) as m FROM teachers').get().m||0;
