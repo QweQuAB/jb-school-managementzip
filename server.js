@@ -84,6 +84,17 @@ CREATE TABLE IF NOT EXISTS timetable_slots (
 );
 
 -- NEW TABLES
+CREATE TABLE IF NOT EXISTS timetable_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  term TEXT DEFAULT '',
+  year TEXT DEFAULT '',
+  createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+  periodsJson TEXT NOT NULL DEFAULT '[]',
+  metaJson TEXT NOT NULL DEFAULT '[]',
+  assignmentsJson TEXT NOT NULL DEFAULT '[]',
+  slotsJson TEXT NOT NULL DEFAULT '[]'
+);
 CREATE TABLE IF NOT EXISTS grading_rules (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   minScore INTEGER NOT NULL, maxScore INTEGER NOT NULL,
@@ -237,6 +248,12 @@ app.put('/api/settings',(req,res)=>{
 
 // ─── Activity ────────────────────────────────────────────────────────────────
 app.get('/api/activity',(req,res)=>res.json(db.prepare('SELECT * FROM activity ORDER BY id DESC LIMIT 25').all()));
+app.post('/api/activity',(req,res)=>{
+  const {text,type}=req.body;
+  if(!text) return res.status(400).json({error:'text required'});
+  logActivity(text,type||'blue');
+  res.json({ok:true});
+});
 
 // ─── Grading Rules ───────────────────────────────────────────────────────────
 app.get('/api/grading',(req,res)=>res.json(db.prepare('SELECT * FROM grading_rules ORDER BY minScore DESC').all()));
@@ -417,6 +434,54 @@ app.post('/api/timetable/slots',(req,res)=>{
   const ins=db.prepare('INSERT OR REPLACE INTO timetable_slots(classId,day,periodId,subjectId,teacherId,label)VALUES(?,?,?,?,?,?)');
   const batch=db.transaction(()=>{classIds.forEach(c=>del.run(c));slots.forEach(s=>ins.run(s.classId,s.day,s.periodId,s.subjectId||null,s.teacherId||null,s.label||''));});
   batch(); res.json({success:true});
+});
+
+// ─── Timetable Snapshots ──────────────────────────────────────────────────────
+app.get('/api/timetable/snapshots',(req,res)=>{
+  const rows=db.prepare('SELECT id,name,term,year,createdAt FROM timetable_snapshots ORDER BY id DESC').all();
+  res.json(rows);
+});
+app.post('/api/timetable/snapshots',(req,res)=>{
+  const {name,term,year}=req.body;
+  if(!name) return res.status(400).json({error:'name required'});
+  const periods=db.prepare('SELECT * FROM timetable_periods').all();
+  const meta=db.prepare('SELECT * FROM timetable_teacher_meta').all();
+  const assignments=db.prepare('SELECT * FROM timetable_assignments').all();
+  const slots=db.prepare('SELECT * FROM timetable_slots').all();
+  const r=db.prepare(`INSERT INTO timetable_snapshots(name,term,year,periodsJson,metaJson,assignmentsJson,slotsJson)
+    VALUES(?,?,?,?,?,?,?)`).run(name,term||'',year||'',JSON.stringify(periods),JSON.stringify(meta),JSON.stringify(assignments),JSON.stringify(slots));
+  logActivity(`Timetable snapshot saved: "${name}"`,'blue');
+  res.json({id:r.lastInsertRowid});
+});
+app.post('/api/timetable/snapshots/:id/restore',(req,res)=>{
+  const snap=db.prepare('SELECT * FROM timetable_snapshots WHERE id=?').get(req.params.id);
+  if(!snap) return res.status(404).json({error:'Snapshot not found'});
+  const periods=JSON.parse(snap.periodsJson||'[]');
+  const meta=JSON.parse(snap.metaJson||'[]');
+  const assignments=JSON.parse(snap.assignmentsJson||'[]');
+  const slots=JSON.parse(snap.slotsJson||'[]');
+  db.transaction(()=>{
+    db.prepare('DELETE FROM timetable_periods').run();
+    db.prepare('DELETE FROM timetable_teacher_meta').run();
+    db.prepare('DELETE FROM timetable_assignments').run();
+    db.prepare('DELETE FROM timetable_slots').run();
+    const insPer=db.prepare('INSERT OR IGNORE INTO timetable_periods(id,name,startTime,endTime,isBreak,sortOrder)VALUES(?,?,?,?,?,?)');
+    periods.forEach(p=>insPer.run(p.id,p.name,p.startTime,p.endTime,p.isBreak?1:0,p.sortOrder||0));
+    const insMeta=db.prepare('INSERT OR IGNORE INTO timetable_teacher_meta(teacherId,teacherType,availableDays,maxPeriodsPerDay,isClassTeacher,classTeacherId)VALUES(?,?,?,?,?,?)');
+    meta.forEach(m=>insMeta.run(m.teacherId,m.teacherType,m.availableDays,m.maxPeriodsPerDay,m.isClassTeacher?1:0,m.classTeacherId||null));
+    const insAss=db.prepare('INSERT OR IGNORE INTO timetable_assignments(id,teacherId,classId,subjectId,periodsPerWeek,contactHours)VALUES(?,?,?,?,?,?)');
+    assignments.forEach(a=>insAss.run(a.id,a.teacherId,a.classId,a.subjectId,a.periodsPerWeek||1,a.contactHours||1));
+    const insSlot=db.prepare('INSERT OR IGNORE INTO timetable_slots(id,classId,day,periodId,subjectId,teacherId,label)VALUES(?,?,?,?,?,?,?)');
+    slots.forEach(s=>insSlot.run(s.id,s.classId,s.day,s.periodId,s.subjectId||null,s.teacherId||null,s.label||''));
+  })();
+  logActivity(`Timetable restored from snapshot: "${snap.name}"`,'blue');
+  res.json({ok:true,restored:{periods:periods.length,slots:slots.length}});
+});
+app.delete('/api/timetable/snapshots/:id',(req,res)=>{
+  const snap=db.prepare('SELECT name FROM timetable_snapshots WHERE id=?').get(req.params.id);
+  if(!snap) return res.status(404).json({error:'Not found'});
+  db.prepare('DELETE FROM timetable_snapshots WHERE id=?').run(req.params.id);
+  res.json({ok:true});
 });
 
 // ─── Grading ─────────────────────────────────────────────────────────────────

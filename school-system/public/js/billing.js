@@ -79,6 +79,7 @@ const BILL_DEFS = {
   logoSize:100,
   watermark:{enabled:false,mode:'text',text:'OFFICIAL',image:null,opacity:15,rotation:-35,size:100},
   background:{enabled:false,text:'',fontSize:8,opacity:6,color:'#1B2D5B',spacing:120,rotation:-30},
+  billCounter:0,
   _blank:false
 };
 
@@ -92,6 +93,7 @@ let _billShowWiz = false;
 let _billShowAdminWiz = false;
 let _billForm1 = {name:'',level:'lp',className:'Lower Primary',transport:'none',term:'3',arrears:0};
 let _billForm2 = {name:'',level:'jhs',className:'JHS',transport:'none',term:'3',arrears:0};
+let _pendingBillSerial = null;  // set when print preview opens, used in printed document
 
 // ─── STORAGE ──────────────────────────────────────────────────────────────────
 function bMerge(target, source) {
@@ -400,6 +402,7 @@ function _bBillDoc(form, billId, isPrint) {
         <div style="display:flex;align-items:center;justify-content:center">${logoHtml}</div>
         <div>${bankHtml}</div>
       </div>
+      ${isPrint && _pendingBillSerial ? `<div style="text-align:right;font-size:${sz(9)};color:#64748B;margin-bottom:${sz(4)};font-family:monospace;letter-spacing:.04em">Serial No: <strong style="color:#1B2D5B">${_pendingBillSerial}</strong> &nbsp;|&nbsp; Issued: ${new Date().toLocaleDateString('en-GH',{day:'2-digit',month:'short',year:'numeric'})}</div>` : ''}
       <div style="display:flex;align-items:baseline;gap:${sz(8)};margin-bottom:${sz(4)};flex-wrap:wrap">
         <span style="font-weight:700;font-size:${sz(11.5)}">NAME:</span>
         <span style="flex:1;border-bottom:1px dashed #444;min-width:${sz(100)};font-size:${sz(12)};padding-bottom:1px">${b.name}</span>
@@ -441,7 +444,21 @@ function _bBillDoc(form, billId, isPrint) {
 }
 
 // ─── PRINT PREVIEW MODAL ──────────────────────────────────────────────────────
-function _billOpenPrint() { _billShowPrint = true; _bRender(); }
+// ─── BILL SERIAL NUMBER ───────────────────────────────────────────────────────
+function _nextBillSerial() {
+  if (!_BS) return 'BILL-0001';
+  _BS.billCounter = (_BS.billCounter || 0) + 1;
+  saveBillS();
+  const yr  = (_BS.academic.year  || new Date().getFullYear()).toString().replace('/','-');
+  const tm  = _BS.academic.term   || '1';
+  return `BILL-${yr}/T${tm}-${String(_BS.billCounter).padStart(4,'0')}`;
+}
+
+function _billOpenPrint() {
+  _pendingBillSerial = _nextBillSerial();
+  _billShowPrint = true;
+  _bRender();
+}
 function _billClosePrint() { _billShowPrint = false; _bRender(); }
 
 function _bPrintModal() {
@@ -474,7 +491,6 @@ function _bPrintModal() {
 function billDoPrint() {
   const area = document.getElementById('bill-print-area');
   if (!area) return;
-  const content = area.innerHTML;
   const pw = window.open('', '_blank', 'width=900,height=700');
   pw.document.write(`<!DOCTYPE html><html><head>
     <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
@@ -488,6 +504,14 @@ function billDoPrint() {
     </body></html>`);
   pw.document.close();
   setTimeout(() => { pw.print(); pw.close(); }, 600);
+  // Log bill print to activity log
+  const studentName = _billForm1.name || 'Unknown';
+  const serial = _pendingBillSerial || '—';
+  fetch('/api/activity', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text: `Bill printed — ${studentName} | Serial: ${serial} | ${_billForm1.className}`, type: 'amber' })
+  }).catch(() => {});
 }
 
 // ─── SETTINGS PAGE ────────────────────────────────────────────────────────────

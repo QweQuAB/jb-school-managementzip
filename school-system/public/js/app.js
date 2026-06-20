@@ -1365,22 +1365,66 @@ function processImpFile(file) {
     try {
       const data = JSON.parse(e.target.result);
       _impData = data;
-      const tables = ['students','teachers','classes','subjects','assessments','fees','attendance','expenses','inventory','scholarships'];
+
+      const groups = [
+        { label: 'Core Records',     icon: 'fa-users',       color: '#3b82f6', tables: ['students','teachers','classes','subjects'] },
+        { label: 'Academic',         icon: 'fa-graduation-cap', color: '#8b5cf6', tables: ['assessments','assignments','announcements','calendar_events','grading_rules'] },
+        { label: 'Finance',          icon: 'fa-money-bill',  color: '#10b981', tables: ['fees','expenses','petty_cash','payroll'] },
+        { label: 'Attendance & HR',  icon: 'fa-clipboard-check', color: '#f59e0b', tables: ['attendance','staff_attendance','leave_requests'] },
+        { label: 'Student Records',  icon: 'fa-folder-open', color: '#ec4899', tables: ['promotions','conduct_log','scholarships','inventory'] },
+        { label: 'Timetable',        icon: 'fa-table',       color: '#0ea5e9', tables: ['timetable_periods','timetable_teacher_meta','timetable_assignments','timetable_slots'] },
+        { label: 'System',           icon: 'fa-cog',         color: '#64748b', tables: ['settings','notifications','activity'] },
+      ];
+
+      const count = t => Array.isArray(data[t]) ? data[t].length : 0;
+      const totalRecords = groups.flatMap(g => g.tables).reduce((s, t) => s + count(t), 0);
+      const exportDate = data.exportedAt ? new Date(data.exportedAt).toLocaleString() : 'Unknown';
+      const isFullExport = data.exportVersion >= 2;
+
       const summary = document.getElementById('imp-summary');
-      const errors = document.getElementById('imp-errors');
-      summary.innerHTML = tables.map(t => {
-        const arr = data[t];
-        const n = Array.isArray(arr) ? arr.length : 0;
-        return `<div style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px">
-          <div style="font-size:11px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">${t}</div>
-          <div style="font-size:20px;font-weight:700;color:${n>0?'var(--primary)':'var(--text-muted)'};margin-top:2px">${n}</div>
-          <div style="font-size:10px;color:var(--text-muted)">record${n===1?'':'s'}</div>
-        </div>`;
-      }).join('');
+      const errors  = document.getElementById('imp-errors');
+
+      summary.innerHTML = `
+        <div style="background:${isFullExport?'#f0fdf4':'#fffbeb'};border:1px solid ${isFullExport?'#bbf7d0':'#fde68a'};border-radius:10px;padding:12px 16px;margin-bottom:14px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+          <div style="flex:1;min-width:180px">
+            <div style="font-weight:700;font-size:.9rem;color:${isFullExport?'#166534':'#92400e'}">${isFullExport?'Full Export (v2)':'Partial Export (legacy)'}</div>
+            <div style="font-size:.78rem;color:var(--text-muted);margin-top:2px">Exported: ${exportDate}</div>
+          </div>
+          <div style="text-align:center">
+            <div style="font-size:1.6rem;font-weight:800;color:var(--primary)">${totalRecords.toLocaleString()}</div>
+            <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.04em">Total Records</div>
+          </div>
+        </div>
+        ${groups.map(g => {
+          const groupTotal = g.tables.reduce((s,t) => s + count(t), 0);
+          return `<div style="margin-bottom:12px">
+            <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px">
+              <i class="fa ${g.icon}" style="color:${g.color};font-size:.8rem;width:14px"></i>
+              <span style="font-size:.75rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted)">${g.label}</span>
+              <span style="font-size:.72rem;color:var(--text-muted);margin-left:auto">${groupTotal} total</span>
+            </div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:6px">
+              ${g.tables.map(t => {
+                const n = count(t);
+                const label = t.replace('timetable_','tt_').replace(/_/g,' ');
+                return `<div style="background:var(--bg);border:1px solid ${n>0?g.color+'44':'var(--border)'};border-radius:8px;padding:8px 10px">
+                  <div style="font-size:10px;font-weight:700;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+                  <div style="font-size:18px;font-weight:800;color:${n>0?g.color:'var(--text-muted)'};margin-top:1px">${n}</div>
+                </div>`;
+              }).join('')}
+            </div>
+          </div>`;
+        }).join('')}`;
+
       errors.innerHTML = '';
       document.getElementById('imp-filename').textContent = file.name;
       document.getElementById('imp-preview').style.display = 'block';
-      document.getElementById('imp-confirm-btn').style.display = 'block';
+
+      const btn = document.getElementById('imp-confirm-btn');
+      if (btn) {
+        btn.style.display = 'inline-flex';
+        btn.innerHTML = `<i class="fa fa-file-import"></i>&nbsp; Import ${totalRecords.toLocaleString()} Records`;
+      }
     } catch (err) {
       toast('Could not parse JSON — is this a valid export file?', 'danger');
     }

@@ -45,6 +45,7 @@ const TT = (function () {
           <select id="ttViewFilter" class="form-control" style="width:190px" onchange="TT.renderTimetableView()"></select>
           <button class="btn btn-primary" onclick="TT.generateAndSave()"><i class="fas fa-magic"></i> Generate</button>
           <button class="btn btn-outline" onclick="TT.renderTimetableView()"><i class="fas fa-sync"></i> Refresh</button>
+          <button class="btn btn-outline" onclick="TT.openSnapshotsModal()" style="margin-left:auto" title="Save or restore timetable snapshots"><i class="fas fa-copy"></i> Copy to Term</button>
         </div>
         <div id="ttViewContainer"></div>
       </div>`;
@@ -763,6 +764,71 @@ const TT = (function () {
     win.document.close();
   }
 
+  // ── SNAPSHOTS ───────────────────────────────────────────────────────────────
+  async function openSnapshotsModal() {
+    const modal = document.getElementById('tt-snapshot-modal');
+    if (!modal) return;
+    openModal('tt-snapshot-modal');
+    await refreshSnapshotList();
+  }
+
+  async function refreshSnapshotList() {
+    const listEl = document.getElementById('tt-snapshot-list');
+    if (!listEl) return;
+    listEl.innerHTML = `<div style="text-align:center;padding:16px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Loading…</div>`;
+    try {
+      const snaps = await API.get('/api/timetable/snapshots');
+      if (!snaps.length) {
+        listEl.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-muted);font-size:.85rem">No snapshots saved yet. Save the current timetable below.</div>`;
+        return;
+      }
+      listEl.innerHTML = snaps.map(s => `
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--white)">
+          <div style="flex:1">
+            <div style="font-weight:600;font-size:.88rem">${s.name}</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">${s.term ? s.term + ' · ' : ''}${s.year ? s.year + ' · ' : ''}Saved ${new Date(s.createdAt).toLocaleDateString()}</div>
+          </div>
+          <button class="btn btn-outline btn-sm" onclick="TT.restoreSnapshot(${s.id},'${s.name.replace(/'/g,"\\'")}')" style="font-size:.78rem"><i class="fas fa-undo"></i> Restore</button>
+          <button onclick="TT.deleteSnapshot(${s.id})" style="background:none;border:none;cursor:pointer;color:var(--danger);padding:4px 8px;font-size:.85rem" title="Delete snapshot"><i class="fas fa-trash"></i></button>
+        </div>`).join('');
+    } catch(e) {
+      listEl.innerHTML = `<div style="color:var(--danger);padding:10px">Failed to load snapshots: ${e.message}</div>`;
+    }
+  }
+
+  async function saveSnapshot() {
+    const nameEl = document.getElementById('tt-snap-name');
+    const termEl = document.getElementById('tt-snap-term');
+    const yearEl = document.getElementById('tt-snap-year');
+    const name = nameEl?.value.trim();
+    if (!name) { toast('Please enter a snapshot name', 'warning'); nameEl?.focus(); return; }
+    try {
+      await API.post('/api/timetable/snapshots', { name, term: termEl?.value || '', year: yearEl?.value || '' });
+      toast(`Snapshot "${name}" saved`, 'success');
+      if (nameEl) nameEl.value = '';
+      await refreshSnapshotList();
+    } catch(e) { toast('Save failed: ' + e.message, 'danger'); }
+  }
+
+  async function restoreSnapshot(id, name) {
+    if (!confirm(`Restore timetable from snapshot "${name}"?\n\nThe current live timetable will be replaced. This cannot be undone.`)) return;
+    try {
+      const r = await API.post(`/api/timetable/snapshots/${id}/restore`, {});
+      toast(`Restored from "${name}" — ${r.restored.slots} slots, ${r.restored.periods} periods`, 'success');
+      closeModal('tt-snapshot-modal');
+      await loadData();
+      renderViewTab();
+    } catch(e) { toast('Restore failed: ' + e.message, 'danger'); }
+  }
+
+  async function deleteSnapshot(id) {
+    if (!confirm('Delete this snapshot? This cannot be undone.')) return;
+    try {
+      await API.delete(`/api/timetable/snapshots/${id}`);
+      await refreshSnapshotList();
+    } catch(e) { toast('Delete failed: ' + e.message, 'danger'); }
+  }
+
   // ── PUBLIC API ─────────────────────────────────────────────────────────────
   return {
     initTimetable, loadData,
@@ -770,7 +836,8 @@ const TT = (function () {
     openTeacherModal, saveTeacherConfig, deleteTeacherConfig,
     addAssignmentRow, onClassTeacherToggle,
     generateAndSave, renderTimetableView, onViewModeChange,
-    printClassTimetable
+    printClassTimetable,
+    openSnapshotsModal, saveSnapshot, restoreSnapshot, deleteSnapshot
   };
 })();
 

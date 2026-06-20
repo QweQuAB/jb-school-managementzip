@@ -1010,6 +1010,56 @@ tr:hover td{background:#f8fafc}
   </div>
 </div>
 
+<!-- Timetable Snapshot / Copy to Term Modal -->
+<div class="modal-overlay" id="tt-snapshot-modal">
+  <div class="modal modal-lg">
+    <div class="modal-header">
+      <h3><i class="fa fa-copy" style="color:var(--primary)"></i> Copy Timetable to Another Term</h3>
+      <button class="modal-close" onclick="closeModal('tt-snapshot-modal')"><i class="fa fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:12px 16px;margin-bottom:18px;font-size:.83rem">
+        <strong style="color:#1e40af"><i class="fa fa-lightbulb"></i> How it works</strong><br>
+        Save the current timetable as a named snapshot (e.g. <em>Term 1 2025/2026</em>). At the start of a new term, restore any snapshot to load that timetable back instantly — no need to regenerate from scratch.
+      </div>
+
+      <!-- Saved snapshots list -->
+      <div style="font-weight:700;font-size:.82rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:10px">Saved Snapshots</div>
+      <div id="tt-snapshot-list" style="max-height:280px;overflow-y:auto;margin-bottom:20px">
+        <div style="text-align:center;padding:20px;color:var(--text-muted);font-size:.85rem"><i class="fas fa-spinner fa-spin"></i> Loading…</div>
+      </div>
+
+      <!-- Save new snapshot form -->
+      <div style="border-top:1px solid var(--border);padding-top:16px">
+        <div style="font-weight:700;font-size:.82rem;text-transform:uppercase;letter-spacing:.05em;color:var(--text-muted);margin-bottom:12px">Save Current Timetable as Snapshot</div>
+        <div style="display:grid;grid-template-columns:1fr 140px 140px;gap:10px;align-items:end">
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Snapshot Name *</label>
+            <input id="tt-snap-name" class="form-control" placeholder="e.g. Term 1 2025/2026" type="text" onkeydown="if(event.key==='Enter')TT.saveSnapshot()">
+          </div>
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Term</label>
+            <select id="tt-snap-term" class="form-control">
+              <option value="">—</option>
+              <option value="Term 1">Term 1</option>
+              <option value="Term 2">Term 2</option>
+              <option value="Term 3">Term 3</option>
+            </select>
+          </div>
+          <div>
+            <label style="font-size:.78rem;font-weight:600;color:var(--text-muted);display:block;margin-bottom:4px">Academic Year</label>
+            <input id="tt-snap-year" class="form-control" placeholder="e.g. 2025/2026" type="text">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal('tt-snapshot-modal')">Close</button>
+      <button class="btn btn-primary" onclick="TT.saveSnapshot()"><i class="fa fa-save"></i> Save Snapshot</button>
+    </div>
+  </div>
+</div>
+
 <!-- Teacher Timetable Config Modal -->
 <div class="modal-overlay" id="ttTeacherModal">
   <div class="modal modal-lg">
