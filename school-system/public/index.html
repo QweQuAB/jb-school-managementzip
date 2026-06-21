@@ -423,13 +423,31 @@ tr:hover td{background:#f8fafc}
 
     <!-- ASSESSMENTS -->
     <div id="section-assessments" class="section">
-      <div class="page-header"><h3><i class="fa fa-clipboard-check"></i> Assessments</h3><button class="btn btn-primary" onclick="openModal('assessment-modal','')"><i class="fa fa-plus"></i> Record Assessment</button></div>
+      <div class="page-header">
+        <h3><i class="fa fa-clipboard-check"></i> Assessments</h3>
+        <div class="actions">
+          <button class="btn btn-outline" onclick="printCASheet()"><i class="fa fa-print"></i> Print CA Sheet</button>
+          <button class="btn btn-primary" onclick="openModal('assessment-modal','')"><i class="fa fa-plus"></i> Record Assessment</button>
+        </div>
+      </div>
       <div class="filters-bar">
         <select class="form-control" id="filter-assessment-class" onchange="loadAssessments()"><option value="">All Classes</option></select>
+        <select class="form-control" id="filter-assessment-subject" onchange="loadAssessments()"><option value="">All Subjects</option></select>
         <select class="form-control" id="filter-assessment-term" onchange="loadAssessments()"><option value="">All Terms</option><option>Term 1</option><option>Term 2</option><option>Term 3</option></select>
       </div>
       <div class="card"><div class="table-wrap"><table>
-        <thead><tr><th>Student</th><th>Subject</th><th>Class</th><th>Term</th><th>T1</th><th>T2</th><th>Exam</th><th>Total</th><th>Grade</th><th></th></tr></thead>
+        <thead><tr>
+          <th>Student</th><th>Subject</th><th>Class</th><th>Term</th>
+          <th title="Class Assessment Exercise">CA /40</th>
+          <th title="Class Test">CT /40</th>
+          <th title="Project/Homework">Proj /20</th>
+          <th title="Total Class Score">Class Total</th>
+          <th title="Class Mark (50%)">Cls Mk</th>
+          <th title="End of Term Exam">Exam /100</th>
+          <th title="Exam 50%">Ex 50%</th>
+          <th title="Overall Total">Overall</th>
+          <th>Grade</th><th></th>
+        </tr></thead>
         <tbody id="assessments-body"></tbody>
       </table></div></div>
     </div>
@@ -851,7 +869,26 @@ tr:hover td{background:#f8fafc}
         <div class="form-group"><label class="form-label">Contact</label><input class="form-control" id="s-contact"></div>
       </div>
       <div class="form-group"><label class="form-label">Address</label><input class="form-control" id="s-address-student"></div>
-      <div class="form-group"><label class="form-label">Photo (URL or Base64)</label><input class="form-control" id="s-photo" placeholder="Optional"></div>
+      <div class="form-group">
+        <label class="form-label">Student Photo <span style="color:var(--text-muted);font-weight:400">(optional)</span></label>
+        <div id="s-photo-drop-zone"
+             style="display:flex;align-items:center;gap:16px;padding:14px;border:2px dashed var(--border);border-radius:10px;background:var(--bg);cursor:pointer;transition:border-color .15s"
+             ondragover="event.preventDefault();this.style.borderColor='var(--primary)'"
+             ondragleave="this.style.borderColor='var(--border)'"
+             ondrop="handleStudentPhotoDrop(event)"
+             onclick="document.getElementById('s-photo-file').click()">
+          <div id="s-photo-preview" style="width:72px;height:72px;border-radius:50%;background:#e2e8f0;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0;border:2px solid var(--border)">
+            <i class="fa fa-user" style="font-size:1.8rem;color:#94a3b8"></i>
+          </div>
+          <div>
+            <div style="font-size:.88rem;font-weight:600;color:var(--text)">Drag &amp; drop a photo here</div>
+            <div style="font-size:.75rem;color:var(--text-muted);margin-top:3px">or click to browse &nbsp;·&nbsp; JPG, PNG, WEBP accepted</div>
+            <button type="button" id="s-photo-clear-btn" onclick="event.stopPropagation();clearStudentPhoto()" style="display:none;background:none;border:none;color:var(--danger);cursor:pointer;font-size:.75rem;padding:2px 0;margin-top:6px"><i class="fa fa-times-circle"></i> Remove photo</button>
+          </div>
+          <input type="file" id="s-photo-file" accept="image/*" style="display:none" onchange="handleStudentPhotoFile(this.files[0])">
+        </div>
+        <input type="hidden" id="s-photo">
+      </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('student-modal')">Cancel</button>
@@ -963,7 +1000,7 @@ tr:hover td{background:#f8fafc}
 
 <!-- Assessment Modal -->
 <div class="modal-overlay" id="assessment-modal">
-  <div class="modal">
+  <div class="modal modal-lg">
     <div class="modal-header"><h3>Record Assessment</h3><button class="modal-close" onclick="closeModal('assessment-modal')"><i class="fa fa-times"></i></button></div>
     <div class="modal-body">
       <div class="form-row">
@@ -974,15 +1011,42 @@ tr:hover td{background:#f8fafc}
         <div class="form-group"><label class="form-label">Class</label><select class="form-control" id="a-classId"><option value="">-- Select --</option></select></div>
         <div class="form-group"><label class="form-label">Term</label><select class="form-control" id="a-term"><option>Term 1</option><option>Term 2</option><option>Term 3</option></select></div>
       </div>
-      <div class="form-row-3">
-        <div class="form-group"><label class="form-label">Test 1 (max 20)</label><input class="form-control" type="number" id="a-test1" max="20" min="0" value="0"></div>
-        <div class="form-group"><label class="form-label">Test 2 (max 20)</label><input class="form-control" type="number" id="a-test2" max="20" min="0" value="0"></div>
-        <div class="form-group"><label class="form-label">Exam (max 60)</label><input class="form-control" type="number" id="a-exam" max="60" min="0" value="0"></div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">
+        <div style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;padding:12px">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#0369a1;margin-bottom:8px;letter-spacing:.04em">Class Assessment Exercise &nbsp;<span style="background:#0369a1;color:#fff;border-radius:4px;padding:1px 6px">/ 40</span></div>
+          <input class="form-control" type="number" id="a-test1" max="40" min="0" value="0" oninput="updateAssessmentCalc()" placeholder="Sub-total score out of 40">
+          <div style="font-size:.7rem;color:#0369a1;margin-top:5px">Sum of all class assessment exercises</div>
+        </div>
+        <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:12px">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#15803d;margin-bottom:8px;letter-spacing:.04em">Class Test &nbsp;<span style="background:#15803d;color:#fff;border-radius:4px;padding:1px 6px">/ 40</span></div>
+          <input class="form-control" type="number" id="a-test2" max="40" min="0" value="0" oninput="updateAssessmentCalc()" placeholder="Sub-total score out of 40">
+          <div style="font-size:.7rem;color:#15803d;margin-top:5px">Sum of all class test scores</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <div style="background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:12px">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#92400e;margin-bottom:8px;letter-spacing:.04em">Project / Homework &nbsp;<span style="background:#92400e;color:#fff;border-radius:4px;padding:1px 6px">/ 20</span></div>
+          <input class="form-control" type="number" id="a-exam" max="20" min="0" value="0" oninput="updateAssessmentCalc()" placeholder="Sub-total score out of 20">
+          <div style="font-size:.7rem;color:#92400e;margin-top:5px">Combined project &amp; homework scores</div>
+        </div>
+        <div style="background:#fdf4ff;border:1px solid #e9d5ff;border-radius:8px;padding:12px">
+          <div style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:#7e22ce;margin-bottom:8px;letter-spacing:.04em">End of Term Exam &nbsp;<span style="background:#7e22ce;color:#fff;border-radius:4px;padding:1px 6px">/ 100</span></div>
+          <input class="form-control" type="number" id="a-exam-raw" max="100" min="0" value="0" oninput="updateAssessmentCalc()" placeholder="Raw exam score out of 100">
+          <div style="font-size:.7rem;color:#7e22ce;margin-top:5px">End of term examination score</div>
+        </div>
+      </div>
+
+      <div id="a-calc-preview" style="background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center">
+        <div><div style="font-size:.68rem;color:var(--text-muted);font-weight:600;text-transform:uppercase">Class Total</div><div id="a-calc-total" style="font-size:1.1rem;font-weight:700;color:var(--text)">0</div><div style="font-size:.65rem;color:var(--text-muted)">/100</div></div>
+        <div><div style="font-size:.68rem;color:var(--text-muted);font-weight:600;text-transform:uppercase">Class Mark 50%</div><div id="a-calc-mark" style="font-size:1.1rem;font-weight:700;color:var(--text)">0.0</div><div style="font-size:.65rem;color:var(--text-muted)">/50</div></div>
+        <div><div style="font-size:.68rem;color:var(--text-muted);font-weight:600;text-transform:uppercase">Exam 50%</div><div id="a-calc-exam50" style="font-size:1.1rem;font-weight:700;color:var(--text)">0.0</div><div style="font-size:.65rem;color:var(--text-muted)">/50</div></div>
+        <div><div style="font-size:.68rem;color:var(--text-muted);font-weight:600;text-transform:uppercase">Overall Total</div><div id="a-calc-overall" style="font-size:1.3rem;font-weight:800;color:var(--primary)">0.0</div><div style="font-size:.65rem;color:var(--text-muted)">/100</div></div>
       </div>
     </div>
     <div class="modal-footer">
       <button class="btn btn-outline" onclick="closeModal('assessment-modal')">Cancel</button>
-      <button class="btn btn-primary" onclick="saveAssessment()">Save</button>
+      <button class="btn btn-primary" onclick="saveAssessment()"><i class="fa fa-save"></i> Save Assessment</button>
     </div>
   </div>
 </div>

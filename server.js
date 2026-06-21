@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS assessments (
   id INTEGER PRIMARY KEY AUTOINCREMENT, studentId INTEGER NOT NULL, subjectId INTEGER,
   classId INTEGER, term TEXT DEFAULT 'Term 1', year INTEGER DEFAULT 2025,
   test1 REAL DEFAULT 0, test2 REAL DEFAULT 0, exam REAL DEFAULT 0,
+  exam_raw REAL DEFAULT 0,
   total REAL DEFAULT 0, grade TEXT DEFAULT 'F', date TEXT DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS fees (
@@ -356,14 +357,24 @@ app.put('/api/subjects/:id',(req,res)=>{
 app.delete('/api/subjects/:id',(req,res)=>{db.prepare('DELETE FROM subjects WHERE id=?').run(req.params.id);res.json({success:true});});
 
 // ─── Assessments ─────────────────────────────────────────────────────────────
+// Migration: add exam_raw column for existing DBs
+try { db.prepare('ALTER TABLE assessments ADD COLUMN exam_raw REAL DEFAULT 0').run(); } catch(e) {}
+
 app.get('/api/assessments',(req,res)=>res.json(db.prepare('SELECT * FROM assessments ORDER BY id DESC').all()));
 app.post('/api/assessments',(req,res)=>{
   const d=req.body;
-  const total=(parseFloat(d.test1)||0)+(parseFloat(d.test2)||0)+(parseFloat(d.exam)||0);
-  const grade=calcGrade(total);
-  const r=db.prepare(`INSERT INTO assessments(studentId,subjectId,classId,term,year,test1,test2,exam,total,grade)VALUES(?,?,?,?,?,?,?,?,?,?)`)
-    .run(d.studentId,d.subjectId||null,d.classId||null,d.term||'Term 1',d.year||2025,d.test1||0,d.test2||0,d.exam||0,total,grade);
-  res.json({id:r.lastInsertRowid,total,grade});
+  const ca=Math.min(parseFloat(d.test1)||0,40);    // Class Assessment Exercise (0-40)
+  const ct=Math.min(parseFloat(d.test2)||0,40);    // Class Test (0-40)
+  const proj=Math.min(parseFloat(d.exam)||0,20);   // Project/Homework (0-20)
+  const examRaw=Math.min(parseFloat(d.exam_raw)||0,100); // End of Term Exam (0-100)
+  const totalClass=ca+ct+proj;                     // Total Class Score (0-100)
+  const classMark=totalClass*0.5;                  // Class Mark 50% (0-50)
+  const exam50=examRaw*0.5;                        // Exam 50% (0-50)
+  const overall=Math.round((classMark+exam50)*10)/10; // Overall Total (0-100)
+  const grade=calcGrade(Math.round(overall));
+  const r=db.prepare(`INSERT INTO assessments(studentId,subjectId,classId,term,year,test1,test2,exam,exam_raw,total,grade)VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(d.studentId,d.subjectId||null,d.classId||null,d.term||'Term 1',d.year||2025,ca,ct,proj,examRaw,overall,grade);
+  res.json({id:r.lastInsertRowid,totalClass,classMark:Math.round(classMark*10)/10,exam50:Math.round(exam50*10)/10,overall,grade});
 });
 app.delete('/api/assessments/:id',(req,res)=>{db.prepare('DELETE FROM assessments WHERE id=?').run(req.params.id);res.json({success:true});});
 

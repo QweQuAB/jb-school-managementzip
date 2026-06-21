@@ -411,14 +411,54 @@ function editStudent(id) {
   if (!s) return;
   _editId = id;
   document.getElementById('student-modal-title').textContent = 'Edit Student';
-  ['firstName','lastName','otherName','gender','dob','admDate','status','parent','contact','photo'].forEach(k => {
+  ['firstName','lastName','otherName','gender','dob','admDate','status','parent','contact'].forEach(k => {
     const el = document.getElementById(`s-${k}`);
     if (el) el.value = s[k] || '';
   });
   document.getElementById('s-address-student').value = s.address || '';
   const sel = document.getElementById('s-classId');
   sel.innerHTML = '<option value="">-- Select --</option>' + _classes.map(c => `<option value="${c.id}"${c.id===s.classId?'selected':''}>${c.name}</option>`).join('');
+  const photo = s.photo || '';
+  document.getElementById('s-photo').value = photo;
+  const preview = document.getElementById('s-photo-preview');
+  const clearBtn = document.getElementById('s-photo-clear-btn');
+  if (preview) preview.innerHTML = photo ? `<img src="${photo}" style="width:100%;height:100%;object-fit:cover">` : `<i class="fa fa-user" style="font-size:1.8rem;color:#94a3b8"></i>`;
+  if (clearBtn) clearBtn.style.display = photo ? 'block' : 'none';
   openModal('student-modal', id);
+}
+
+function handleStudentPhotoDrop(e) {
+  e.preventDefault();
+  const zone = document.getElementById('s-photo-drop-zone');
+  if (zone) zone.style.borderColor = 'var(--border)';
+  const file = e.dataTransfer?.files[0];
+  if (file) handleStudentPhotoFile(file);
+}
+
+function handleStudentPhotoFile(file) {
+  if (!file) return;
+  if (!file.type.startsWith('image/')) { toast('Please select an image file (JPG, PNG, WEBP)', 'danger'); return; }
+  if (file.size > 5 * 1024 * 1024) { toast('Image too large — please use a photo under 5MB', 'warning'); return; }
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const base64 = ev.target.result;
+    document.getElementById('s-photo').value = base64;
+    const preview = document.getElementById('s-photo-preview');
+    if (preview) preview.innerHTML = `<img src="${base64}" style="width:100%;height:100%;object-fit:cover">`;
+    const clearBtn = document.getElementById('s-photo-clear-btn');
+    if (clearBtn) clearBtn.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearStudentPhoto() {
+  document.getElementById('s-photo').value = '';
+  const preview = document.getElementById('s-photo-preview');
+  if (preview) preview.innerHTML = `<i class="fa fa-user" style="font-size:1.8rem;color:#94a3b8"></i>`;
+  const clearBtn = document.getElementById('s-photo-clear-btn');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const fileInput = document.getElementById('s-photo-file');
+  if (fileInput) fileInput.value = '';
 }
 
 async function saveStudent() {
@@ -453,11 +493,12 @@ async function deleteStudent(id) {
 function openStudentModal() {
   _editId = null;
   document.getElementById('student-modal-title').textContent = 'Add Student';
-  ['firstName','lastName','otherName','gender','dob','admDate','parent','contact','photo'].forEach(k => {
+  ['firstName','lastName','otherName','gender','dob','admDate','parent','contact'].forEach(k => {
     const el = document.getElementById(`s-${k}`); if (el) el.value = '';
   });
   document.getElementById('s-address-student').value = '';
   document.getElementById('s-status').value = 'Active';
+  clearStudentPhoto();
   const sel = document.getElementById('s-classId');
   sel.innerHTML = '<option value="">-- Select --</option>' + _classes.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   openModal('student-modal');
@@ -655,6 +696,9 @@ function populateClassDropdowns() {
     const el = document.getElementById(id);
     if (el) { const prev = el.value; el.innerHTML = opt; if (prev) el.value = prev; }
   });
+  const subOpt = '<option value="">All Subjects</option>' + _subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+  const subjEl = document.getElementById('filter-assessment-subject');
+  if (subjEl) { const prev = subjEl.value; subjEl.innerHTML = subOpt; if (prev) subjEl.value = prev; }
 }
 
 // ─── SUBJECTS ────────────────────────────────────────────────────────────────
@@ -712,20 +756,48 @@ async function loadAssessments() {
   const all = await API.get('/api/assessments');
   const fc = document.getElementById('filter-assessment-class').value;
   const ft = document.getElementById('filter-assessment-term').value;
+  const fs = document.getElementById('filter-assessment-subject')?.value;
   let list = all;
   if (fc) list = list.filter(a => String(a.classId) === fc);
   if (ft) list = list.filter(a => a.term === ft);
+  if (fs) list = list.filter(a => String(a.subjectId) === fs);
   const gradeColors = { A: 'badge-green', B: 'badge-blue', C: 'badge-amber', D: 'badge-amber', F: 'badge-red' };
   document.getElementById('assessments-body').innerHTML = list.map(a => {
-    const s = _students.find(x => x.id === a.studentId), sub = _subjects.find(x => x.id === a.subjectId), cls = _classes.find(x => x.id === a.classId);
+    const st = _students.find(x => x.id === a.studentId), sub = _subjects.find(x => x.id === a.subjectId), cls = _classes.find(x => x.id === a.classId);
+    const totalClass = (a.test1||0)+(a.test2||0)+(a.exam||0);
+    const classMark = (totalClass*0.5).toFixed(1);
+    const exam50 = ((a.exam_raw||0)*0.5).toFixed(1);
     return `<tr>
-      <td>${s?`${s.firstName} ${s.lastName}`:'?'}</td><td>${sub?sub.name:'?'}</td><td>${cls?cls.name:'-'}</td>
-      <td>${a.term}</td><td>${a.test1}</td><td>${a.test2}</td><td>${a.exam}</td>
-      <td style="font-weight:600">${a.total}</td>
+      <td>${st?`${st.firstName} ${st.lastName}`:'?'}</td><td>${sub?sub.name:'?'}</td><td>${cls?cls.name:'-'}</td>
+      <td>${a.term}</td>
+      <td style="text-align:center">${a.test1}</td>
+      <td style="text-align:center">${a.test2}</td>
+      <td style="text-align:center">${a.exam}</td>
+      <td style="text-align:center;font-weight:600">${totalClass}</td>
+      <td style="text-align:center">${classMark}</td>
+      <td style="text-align:center">${a.exam_raw||0}</td>
+      <td style="text-align:center">${exam50}</td>
+      <td style="text-align:center;font-weight:700;color:var(--primary)">${a.total}</td>
       <td><span class="badge ${gradeColors[a.grade]||'badge-gray'}">${a.grade}</span></td>
       <td><button class="btn btn-sm btn-danger" onclick="deleteAssessment(${a.id})"><i class="fa fa-trash"></i></button></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="10"><div class="empty-state" style="padding:30px"><i class="fa fa-clipboard-check"></i><h4>No assessments yet</h4></div></td></tr>';
+  }).join('') || '<tr><td colspan="14"><div class="empty-state" style="padding:30px"><i class="fa fa-clipboard-check"></i><h4>No assessments yet</h4></div></td></tr>';
+}
+
+function updateAssessmentCalc() {
+  const ca = parseFloat(document.getElementById('a-test1').value)||0;
+  const ct = parseFloat(document.getElementById('a-test2').value)||0;
+  const proj = parseFloat(document.getElementById('a-exam').value)||0;
+  const examRaw = parseFloat(document.getElementById('a-exam-raw').value)||0;
+  const totalClass = ca + ct + proj;
+  const classMark = totalClass * 0.5;
+  const exam50 = examRaw * 0.5;
+  const overall = classMark + exam50;
+  const setTxt = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setTxt('a-calc-total', totalClass);
+  setTxt('a-calc-mark', classMark.toFixed(1));
+  setTxt('a-calc-exam50', exam50.toFixed(1));
+  setTxt('a-calc-overall', overall.toFixed(1));
 }
 
 async function saveAssessment() {
@@ -736,13 +808,152 @@ async function saveAssessment() {
     term: document.getElementById('a-term').value,
     test1: parseFloat(document.getElementById('a-test1').value)||0,
     test2: parseFloat(document.getElementById('a-test2').value)||0,
-    exam: parseFloat(document.getElementById('a-exam').value)||0
+    exam: parseFloat(document.getElementById('a-exam').value)||0,
+    exam_raw: parseFloat(document.getElementById('a-exam-raw').value)||0
   };
   if (!d.studentId) { toast('Please select a student', 'danger'); return; }
   const r = await API.post('/api/assessments', d);
-  toast(`Assessment saved – Total: ${r.total}, Grade: ${r.grade}`);
+  toast(`Assessment saved — Overall: ${r.overall}, Grade: ${r.grade}`);
   closeModal('assessment-modal');
   loadAssessments();
+}
+
+async function printCASheet() {
+  const classId = parseInt(document.getElementById('filter-assessment-class').value)||null;
+  const subjectId = parseInt(document.getElementById('filter-assessment-subject')?.value)||null;
+  const term = document.getElementById('filter-assessment-term').value || _settings.currentTerm || 'Term 1';
+  if (!classId || !subjectId) {
+    toast('Select a Class and Subject from the filters above, then click Print CA Sheet', 'warning');
+    return;
+  }
+  const cls = _classes.find(c => c.id === classId);
+  const sub = _subjects.find(s => s.id === subjectId);
+  const allAssessments = await API.get('/api/assessments');
+  const students = _students.filter(s => s.classId === classId).sort((a,b)=>(a.lastName+a.firstName).localeCompare(b.lastName+b.firstName));
+  const records = allAssessments.filter(a => a.classId === classId && a.subjectId === subjectId && (!term || a.term === term));
+  const recMap = {};
+  records.forEach(r => { recMap[r.studentId] = r; });
+  // Assign positions by overall total
+  const scored = records.map(r => r.total||0).sort((a,b) => b-a);
+  const posMap = {};
+  records.forEach(r => {
+    const pos = scored.indexOf(r.total||0) + 1;
+    posMap[r.studentId] = pos;
+  });
+  const clsAvg = records.length ? (records.reduce((s,r)=>s+(r.total||0),0)/records.length).toFixed(1) : '—';
+  const teacherName = (() => { if (!cls.teacherId) return '—'; const t = _teachers?.find?.(t=>t.id===cls.teacherId); return t ? `${t.firstName} ${t.lastName}` : '—'; })();
+  const s = _settings;
+  const logoHtml = s.logo ? `<img src="${s.logo}" style="max-height:55px;object-fit:contain">` : `<div style="width:55px;height:55px;background:#e2e8f0;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:20px">🏫</div>`;
+  const TOTAL_ROWS = 40;
+  let rows = '';
+  for (let i = 0; i < TOTAL_ROWS; i++) {
+    const student = students[i];
+    const rec = student ? recMap[student.id] : null;
+    const name = student ? `${student.lastName} ${student.firstName}${student.otherName?' '+student.otherName:''}`.toUpperCase() : '';
+    const ca = rec ? rec.test1 : '';
+    const ct = rec ? rec.test2 : '';
+    const proj = rec ? rec.exam : '';
+    const totalCls = rec ? (rec.test1||0)+(rec.test2||0)+(rec.exam||0) : '';
+    const clsMark = rec ? ((totalCls||0)*0.5).toFixed(1) : '';
+    const examRaw = rec ? (rec.exam_raw||0) : '';
+    const exam50 = rec ? ((rec.exam_raw||0)*0.5).toFixed(1) : '';
+    const overall = rec ? rec.total : '';
+    const pos = (rec && posMap[student?.id]) ? posMap[student.id] : '';
+    rows += `<tr>
+      <td style="text-align:center;font-size:10px">${i+1}</td>
+      <td style="font-weight:${name?600:400};font-size:11px">${name}</td>
+      <td></td><td></td><td></td>
+      <td style="text-align:center;font-weight:600;background:#f0f9ff">${ca}</td>
+      <td></td><td></td><td></td>
+      <td style="text-align:center;font-weight:600;background:#f0fdf4">${ct}</td>
+      <td></td><td></td>
+      <td style="text-align:center;font-weight:600;background:#fefce8">${proj}</td>
+      <td style="text-align:center;font-weight:700">${totalCls}</td>
+      <td style="text-align:center;font-weight:600">${clsMark}</td>
+      <td style="text-align:center">${examRaw}</td>
+      <td style="text-align:center;font-weight:600">${exam50}</td>
+      <td style="text-align:center;font-weight:800;color:#1d4ed8">${overall}</td>
+      <td style="text-align:center">${pos}</td>
+    </tr>`;
+  }
+  const win = window.open('', '_blank', 'width=1250,height=900');
+  win.document.write(`<!DOCTYPE html><html><head><title>CA Sheet — ${sub?.name} ${cls?.name}</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:Arial,sans-serif;font-size:11px;padding:14px}
+    .hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:6px}
+    .title{text-align:center;font-weight:700;font-size:14px;text-transform:uppercase;margin-bottom:2px}
+    .subtitle{text-align:center;font-weight:700;font-size:12px;text-transform:uppercase;margin-bottom:8px}
+    .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 24px;margin-bottom:10px;font-size:11px}
+    .info-row{display:flex;align-items:flex-end;gap:6px;border-bottom:1px solid #000;padding:2px 0;margin-bottom:4px}
+    .info-label{font-weight:700;white-space:nowrap;flex-shrink:0}
+    .info-val{flex:1;min-width:80px}
+    table{width:100%;border-collapse:collapse;font-size:10px}
+    th{background:#1e293b;color:#fff;padding:4px 3px;text-align:center;font-size:9px;font-weight:700;border:1px solid #334155;line-height:1.2}
+    td{padding:2px 3px;border:1px solid #94a3b8;height:16px;vertical-align:middle}
+    .th-group{background:#1e3a5f}
+    .th-sub{background:#334155;font-size:8px}
+    tr:nth-child(even){background:#f8fafc}
+    @media print{body{padding:6px}@page{size:A3 landscape;margin:8mm}}
+  </style></head><body>
+  <div class="hdr">
+    <div style="display:flex;align-items:center;gap:10px">${logoHtml}
+      <div><div style="font-weight:700;font-size:14px">${s.schoolName||'School'}</div>
+        <div style="font-style:italic;font-size:10px;color:#64748b">"${s.motto||''}"</div></div>
+    </div>
+    <div style="text-align:center;flex:1">
+      <div class="title">Continuous Assessment at ${s.schoolName||'School'}</div>
+      <div class="subtitle">Termly Assessment Plan</div>
+    </div>
+    <div style="text-align:right;font-size:10px;color:#64748b">${s.address||''}<br>${s.phone||''}</div>
+  </div>
+  <div class="info-grid">
+    <div>
+      <div class="info-row"><span class="info-label">SUBJECT:</span><span class="info-val">${sub?.name||''}</span></div>
+      <div class="info-row"><span class="info-label">CLASS:</span><span class="info-val">${cls?.name||''}</span></div>
+      <div class="info-row"><span class="info-label">NO. ON ROLL:</span><span class="info-val">${students.length}</span></div>
+      <div class="info-row"><span class="info-label">TEACHER:</span><span class="info-val">${teacherName}</span></div>
+    </div>
+    <div>
+      <div class="info-row"><span class="info-label">YEAR:</span><span class="info-val">${s.academicYear||''}</span></div>
+      <div class="info-row"><span class="info-label">TERM:</span><span class="info-val">${term}</span></div>
+      <div class="info-row"><span class="info-label">CLASS AVERAGE:</span><span class="info-val">${clsAvg} &nbsp;<span style="font-size:9px;color:#64748b">(Calculated from Overall Total)</span></span></div>
+    </div>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:24px">#</th>
+        <th rowspan="2" style="width:140px;text-align:left">NAME</th>
+        <th colspan="4" class="th-group">CLASS ASSESSMENT EXERCISE</th>
+        <th colspan="4" class="th-group">CLASS TEST</th>
+        <th colspan="3" class="th-group">PROJECT / HOMEWORK</th>
+        <th rowspan="2" style="width:38px">TOTAL CLASS SCORE</th>
+        <th rowspan="2" style="width:34px">CLASS MARK 50%</th>
+        <th rowspan="2" style="width:36px">END OF TERM EXAM (100)</th>
+        <th rowspan="2" style="width:30px">50%</th>
+        <th rowspan="2" style="width:38px">OVERALL TOTAL</th>
+        <th rowspan="2" style="width:38px">POSITION IN SUBJECT</th>
+      </tr>
+      <tr>
+        <th class="th-sub">1</th><th class="th-sub">2</th><th class="th-sub">3</th>
+        <th class="th-sub" style="background:#0f2d4a">SUB TOTAL 40</th>
+        <th class="th-sub">1</th><th class="th-sub">2</th><th class="th-sub">3</th>
+        <th class="th-sub" style="background:#0f2d4a">SUB TOTAL 40</th>
+        <th class="th-sub">1</th><th class="th-sub">2</th>
+        <th class="th-sub" style="background:#0f2d4a">SUB TOTAL 20</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div style="margin-top:18px;display:flex;justify-content:space-between;font-size:11px">
+    <div style="text-align:center"><div style="width:160px;border-bottom:1px solid #000;margin-bottom:3px"></div>Class Teacher</div>
+    <div style="text-align:center"><div style="width:160px;border-bottom:1px solid #000;margin-bottom:3px"></div>${s.adminRole||'Head Teacher'}</div>
+    <div style="text-align:center"><div style="width:160px;border-bottom:1px solid #000;margin-bottom:3px"></div>Date</div>
+  </div>
+  <script>window.onload=function(){window.print()}<\/script>
+  </body></html>`);
+  win.document.close();
 }
 
 async function deleteAssessment(id) {

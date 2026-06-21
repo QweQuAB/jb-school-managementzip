@@ -45,6 +45,8 @@ const TT = (function () {
           <select id="ttViewFilter" class="form-control" style="width:190px" onchange="TT.renderTimetableView()"></select>
           <button class="btn btn-primary" onclick="TT.generateAndSave()"><i class="fas fa-magic"></i> Generate</button>
           <button class="btn btn-outline" onclick="TT.renderTimetableView()"><i class="fas fa-sync"></i> Refresh</button>
+          <button class="btn btn-secondary" onclick="TT.printAllClasses()" title="Print all class timetables in one go"><i class="fas fa-print"></i> Print All Classes</button>
+          <button class="btn btn-secondary" onclick="TT.printAllTeachers()" title="Print all teacher schedules in one go"><i class="fas fa-print"></i> Print All Teachers</button>
           <button class="btn btn-outline" onclick="TT.openSnapshotsModal()" style="margin-left:auto" title="Save or restore timetable snapshots"><i class="fas fa-copy"></i> Copy to Term</button>
         </div>
         <div id="ttViewContainer"></div>
@@ -645,13 +647,16 @@ const TT = (function () {
     const totalPeriods = tSlots.filter(s => !tt.periods.find(p => p.id === s.periodId && p.isBreak) && s.label !== 'Free').length;
 
     let html = `
-      <div style="margin-bottom:12px">
-        <h3 style="font-size:15px;font-weight:700;margin:0 0 3px">${teacher.firstName} ${teacher.lastName} — Weekly Schedule</h3>
-        <div style="font-size:12px;color:var(--text-muted)">
-          ${meta
-            ? `${meta.teacherType} · Available: ${(meta.availableDays || DAYS).join(', ')} · Max ${meta.maxPeriodsPerDay}/day · ${totalPeriods} teaching period(s) this week`
-            : `Full-time · ${totalPeriods} teaching period(s) this week`}
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px">
+        <div>
+          <h3 style="font-size:15px;font-weight:700;margin:0 0 3px">${teacher.firstName} ${teacher.lastName} — Weekly Schedule</h3>
+          <div style="font-size:12px;color:var(--text-muted)">
+            ${meta
+              ? `${meta.teacherType} · Available: ${(meta.availableDays || DAYS).join(', ')} · Max ${meta.maxPeriodsPerDay}/day · ${totalPeriods} teaching period(s) this week`
+              : `Full-time · ${totalPeriods} teaching period(s) this week`}
+          </div>
         </div>
+        <button class="btn btn-secondary" onclick="TT.printTeacherTimetable(${teacherId})"><i class="fas fa-print"></i> Print</button>
       </div>
       <div class="table-wrapper">
         <table style="min-width:640px">
@@ -764,6 +769,169 @@ const TT = (function () {
     win.document.close();
   }
 
+  // ── TEACHER PRINT ──────────────────────────────────────────────────────────
+  function buildTeacherTimetableHTML(teacherId) {
+    const teacher = _teachers.find(t => t.id === teacherId); if (!teacher) return '';
+    const meta = tt.meta[teacherId];
+    const periods = [...tt.periods].sort((a, b) => a.sortOrder - b.sortOrder);
+    const tSlots = tt.slots.filter(s => s.teacherId === teacherId);
+    const s = _settings;
+    let rows = '';
+    periods.forEach(p => {
+      rows += `<tr style="${p.isBreak ? 'background:#fef9c3' : ''}">
+        <td style="font-weight:700;font-size:11px;white-space:nowrap">${p.name}<br><span style="font-weight:400;color:#64748b">${p.startTime}–${p.endTime}</span></td>`;
+      DAYS.forEach(day => {
+        if (p.isBreak) { rows += `<td style="text-align:center;color:#92400e;font-style:italic">${p.name}</td>`; return; }
+        const avail = !meta || meta.teacherType === 'Full-time' || (meta.availableDays || DAYS).includes(day);
+        const slot = tSlots.find(sl => sl.day === day && sl.periodId === p.id);
+        if (!slot) {
+          rows += `<td style="text-align:center;color:#94a3b8;font-size:10px;${avail?'':'background:#f1f5f9'}">
+            ${avail ? '—' : '<span style="opacity:.5">N/A</span>'}
+          </td>`;
+          return;
+        }
+        const isClash = slot.label === '⚠';
+        rows += `<td style="text-align:center">
+          <strong style="font-size:11px;color:${isClash ? '#ef4444' : '#1d4ed8'}">${sName(slot.subjectId)}</strong>
+          <br><span style="font-size:10px;color:#64748b">${cName(slot.classId)}</span>
+          ${isClash ? `<br><span style="font-size:9px;color:#ef4444">⚠ Clash</span>` : ''}
+        </td>`;
+      });
+      rows += `</tr>`;
+    });
+    const totalPeriods = tSlots.filter(sl => !tt.periods.find(p => p.id === sl.periodId && p.isBreak) && sl.label !== 'Free').length;
+    return { teacher, meta, rows, totalPeriods, s };
+  }
+
+  function printTeacherTimetable(teacherId) {
+    const { teacher, meta, rows, totalPeriods, s } = buildTeacherTimetableHTML(teacherId);
+    const logoHtml = s.logo
+      ? `<img src="${s.logo}" style="max-height:60px;object-fit:contain">`
+      : '<div style="width:60px;height:60px;background:#e2e8f0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px">🏫</div>';
+    const win = window.open('', '_blank', 'width=1000,height=700');
+    win.document.write(buildPrintWindow(`${teacher.firstName} ${teacher.lastName}`, _buildTeacherPage({ teacher, meta, rows, totalPeriods, s, logoHtml }), s));
+    win.document.close();
+  }
+
+  function _buildTeacherPage({ teacher, meta, rows, totalPeriods, s, logoHtml }) {
+    const availInfo = meta ? `${meta.teacherType} · Available: ${(meta.availableDays || DAYS).join(', ')} · Max ${meta.maxPeriodsPerDay}/day · ${totalPeriods} period(s)/week`
+      : `Full-time · ${totalPeriods} period(s)/week`;
+    return `
+    <div class="hdr">
+      <div style="display:flex;align-items:center;gap:12px">${logoHtml}<div>
+        <div style="font-size:17px;font-weight:700;color:#1d4ed8">${s.schoolName || 'School'}</div>
+        <div style="font-style:italic;color:#3b82f6;font-size:11px">"${s.motto || 'Excellence in Education'}"</div>
+      </div></div>
+      <div style="text-align:right;font-size:11px;color:#64748b">${s.address || ''}${s.city ? ', ' + s.city : ''}<br>${s.phone || ''}<br>${s.email || ''}</div>
+    </div>
+    <h2>TEACHER SCHEDULE — ${teacher.firstName} ${teacher.lastName}</h2>
+    <p style="text-align:center;font-size:11px;color:#64748b;margin:0 0 12px">${s.currentTerm || 'Term 1'} ${s.academicYear || 2025} &nbsp;|&nbsp; ${availInfo}</p>
+    <table><thead><tr><th>Period</th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="ftr">
+      <div style="display:flex;align-items:center;gap:10px">${logoHtml}
+        <div><div style="font-weight:700;font-size:11px;color:#1d4ed8">${s.schoolName || ''}</div>
+        <div style="font-size:10px;color:#94a3b8;font-style:italic">"${s.motto || ''}"</div></div>
+      </div>
+      <div style="display:flex;gap:32px;font-size:11px">
+        <div style="text-align:center"><div style="width:100px;border-bottom:1px solid #1e293b;margin-bottom:3px"></div>Teacher</div>
+        <div style="text-align:center"><div style="width:100px;border-bottom:1px solid #1e293b;margin-bottom:3px"></div>${s.adminRole || 'Head Teacher'}</div>
+      </div>
+    </div>`;
+  }
+
+  function buildPrintWindow(title, body, s) {
+    return `<!DOCTYPE html><html><head><title>Timetable — ${title}</title>
+    <style>
+      *{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:20px;font-size:13px}
+      .hdr{display:flex;align-items:flex-start;justify-content:space-between;border-bottom:3px solid #1d4ed8;padding-bottom:12px;margin-bottom:16px}
+      h2{text-align:center;font-size:14px;margin:0 0 4px}
+      table{width:100%;border-collapse:collapse}
+      th{background:#1d4ed8;color:#fff;padding:8px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+      td{padding:7px 8px;border:1px solid #e2e8f0;vertical-align:middle}
+      .ftr{margin-top:24px;display:flex;justify-content:space-between;align-items:center;padding-top:12px;border-top:1px solid #e2e8f0}
+      .page-break{page-break-after:always;break-after:page}
+      @media print{.no-print{display:none!important}@page{size:A4 landscape;margin:10mm}}
+    </style></head><body>${body}
+    <script>window.onload=function(){window.print()}<\/script>
+    </body></html>`;
+  }
+
+  function printAllClasses() {
+    if (!_classes.length) { toast && toast('No classes found', 'warning'); return; }
+    const s = _settings;
+    const logoHtml = s.logo
+      ? `<img src="${s.logo}" style="max-height:60px;object-fit:contain">`
+      : '<div style="width:60px;height:60px;background:#e2e8f0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px">🏫</div>';
+    let allPages = '';
+    _classes.forEach((cls, idx) => {
+      const cSlots = tt.slots.filter(sl => sl.classId === cls.id);
+      const periods = [...tt.periods].sort((a, b) => a.sortOrder - b.sortOrder);
+      let rows = '';
+      periods.forEach(p => {
+        rows += `<tr style="${p.isBreak ? 'background:#fef9c3' : ''}">
+          <td style="font-weight:700;font-size:11px;white-space:nowrap">${p.name}<br><span style="font-weight:400;color:#64748b">${p.startTime}–${p.endTime}</span></td>`;
+        DAYS.forEach(day => {
+          const slot = cSlots.find(sl => sl.day === day && sl.periodId === p.id);
+          if (!slot) { rows += `<td>—</td>`; return; }
+          if (p.isBreak || slot.label === p.name) { rows += `<td style="text-align:center;color:#92400e;font-style:italic">${p.name}</td>`; return; }
+          const isFree = slot.label === 'Free' || (!slot.subjectId && slot.label !== '⚠');
+          const isClash = slot.label === '⚠';
+          rows += `<td style="text-align:center">
+            <strong style="font-size:11px;color:${isClash ? '#ef4444' : isFree ? '#94a3b8' : '#1d4ed8'}">${isFree ? 'Free' : sName(slot.subjectId)}</strong>
+            ${slot.teacherId && !isFree ? `<br><span style="font-size:10px;color:#64748b">${tName(slot.teacherId)}</span>` : ''}
+            ${isClash ? `<br><span style="font-size:9px;color:#ef4444">⚠</span>` : ''}
+          </td>`;
+        });
+        rows += `</tr>`;
+      });
+      allPages += `
+        <div class="${idx < _classes.length - 1 ? 'page-break' : ''}">
+          <div class="hdr">
+            <div style="display:flex;align-items:center;gap:12px">${logoHtml}<div>
+              <div style="font-size:17px;font-weight:700;color:#1d4ed8">${s.schoolName || 'School'}</div>
+              <div style="font-style:italic;color:#3b82f6;font-size:11px">"${s.motto || ''}"</div>
+            </div></div>
+            <div style="text-align:right;font-size:11px;color:#64748b">${s.address || ''}<br>${s.phone || ''}</div>
+          </div>
+          <h2>CLASS TIMETABLE — ${cls.name}</h2>
+          <p style="text-align:center;font-size:11px;color:#64748b;margin:0 0 12px">${s.currentTerm || 'Term 1'} ${s.academicYear || 2025} &nbsp;|&nbsp; Class Teacher: <strong>${cls.teacherId ? tName(cls.teacherId) : '—'}</strong></p>
+          <table><thead><tr><th>Period</th>${DAYS.map(d => `<th>${d}</th>`).join('')}</tr></thead>
+          <tbody>${rows}</tbody></table>
+          <div class="ftr">
+            <div style="display:flex;align-items:center;gap:10px">${logoHtml}
+              <div><div style="font-weight:700;font-size:11px;color:#1d4ed8">${s.schoolName || ''}</div>
+              <div style="font-size:10px;color:#94a3b8;font-style:italic">"${s.motto || ''}"</div></div>
+            </div>
+            <div style="display:flex;gap:32px;font-size:11px">
+              <div style="text-align:center"><div style="width:100px;border-bottom:1px solid #1e293b;margin-bottom:3px"></div>Class Teacher</div>
+              <div style="text-align:center"><div style="width:100px;border-bottom:1px solid #1e293b;margin-bottom:3px"></div>${s.adminRole || 'Head Teacher'}</div>
+            </div>
+          </div>
+        </div>`;
+    });
+    const win = window.open('', '_blank', 'width=1000,height=700');
+    win.document.write(buildPrintWindow('All Classes', allPages, s));
+    win.document.close();
+  }
+
+  function printAllTeachers() {
+    if (!_teachers.length) { toast && toast('No teachers found', 'warning'); return; }
+    const s = _settings;
+    const logoHtml = s.logo
+      ? `<img src="${s.logo}" style="max-height:60px;object-fit:contain">`
+      : '<div style="width:60px;height:60px;background:#e2e8f0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px">🏫</div>';
+    let allPages = '';
+    _teachers.forEach((teacher, idx) => {
+      const data = buildTeacherTimetableHTML(teacher.id);
+      data.logoHtml = logoHtml;
+      allPages += `<div class="${idx < _teachers.length - 1 ? 'page-break' : ''}">${_buildTeacherPage(data)}</div>`;
+    });
+    const win = window.open('', '_blank', 'width=1000,height=700');
+    win.document.write(buildPrintWindow('All Teachers', allPages, s));
+    win.document.close();
+  }
+
   // ── SNAPSHOTS ───────────────────────────────────────────────────────────────
   async function openSnapshotsModal() {
     const modal = document.getElementById('tt-snapshot-modal');
@@ -836,7 +1004,7 @@ const TT = (function () {
     openTeacherModal, saveTeacherConfig, deleteTeacherConfig,
     addAssignmentRow, onClassTeacherToggle,
     generateAndSave, renderTimetableView, onViewModeChange,
-    printClassTimetable,
+    printClassTimetable, printTeacherTimetable, printAllClasses, printAllTeachers,
     openSnapshotsModal, saveSnapshot, restoreSnapshot, deleteSnapshot
   };
 })();
